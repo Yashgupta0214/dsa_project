@@ -91,7 +91,7 @@ export function ChatMessages({
 
   return (
     <div
-      className="flex-1 flex flex-col py-4 overflow-y-auto"
+      className="flex-1 flex flex-col overflow-y-auto px-3 pb-2"
       ref={chatRef}
     >
       {!hasNextPage && <div className="flex-1" />}
@@ -110,7 +110,7 @@ export function ChatMessages({
           )}
         </div>
       )}
-      <div className="flex flex-col-reverse mt-auto">
+      <div className="flex flex-col-reverse mt-auto rounded-xl border border-white/60 bg-white/35 shadow-sm shadow-black/5 backdrop-blur-sm dark:border-white/10 dark:bg-black/10">
         {data?.pages.map((group, index) => (
           <Fragment key={index}>
             {group?.items.map((message: MessagesWithMemberWithProfile) => (

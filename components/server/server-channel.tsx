@@ -44,17 +44,20 @@ export function ServerChannel({
   return (
     <button
       className={cn(
-        "group px-2.5 py-1.5 rounded-lg flex items-center gap-x-2.5 w-full transition-all duration-150 focus:outline-none",
+        "group relative px-2.5 py-1.5 rounded-md flex items-center gap-x-2 w-full transition-all duration-150 focus:outline-none",
         !isActive &&
           "hover:bg-zinc-200/60 dark:hover:bg-white/[0.04] text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200",
         isActive &&
-          "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-semibold shadow-sm"
+          "bg-indigo-500/10 dark:bg-indigo-500/12 text-indigo-600 dark:text-indigo-300 font-semibold"
       )}
       onClick={onClick}
     >
+      {isActive && (
+        <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />
+      )}
       <Icon
         className={cn(
-          "flex-shrink-0 w-4 h-4 transition-colors",
+          "flex-shrink-0 w-3.5 h-3.5 transition-colors",
           !isActive && "text-zinc-400 group-hover:text-zinc-500 dark:text-zinc-500 dark:group-hover:text-zinc-300",
           isActive && channel.type === ChannelType.TEXT && "text-indigo-500 dark:text-indigo-400",
           isActive && channel.type === ChannelType.AUDIO && "text-emerald-500 dark:text-emerald-400",
@@ -63,7 +66,7 @@ export function ServerChannel({
       />
       <p
         className={cn(
-          "line-clamp-1 text-sm tracking-tight transition-colors",
+          "line-clamp-1 text-[13px] tracking-tight transition-colors",
           !isActive && "group-hover:text-zinc-700 dark:group-hover:text-zinc-200",
           isActive && "text-indigo-600 dark:text-indigo-300 font-medium"
         )}

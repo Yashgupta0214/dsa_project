@@ -4,7 +4,7 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus } from "lucide-react";
+import { Plus, SendHorizonal } from "lucide-react";
 import axios from "axios";
 import qs from "query-string";
 import { useRouter } from "next/navigation";
@@ -59,20 +59,20 @@ export function ChatInput({ apiUrl, query, name, type }: ChatInputProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 pb-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="px-3 pb-3 pt-1">
         <FormField
           control={form.control}
           name="content"
           render={({ field }) => (
             <FormItem>
               <FormControl>
-                <div className="relative flex items-center rounded-2xl bg-zinc-200/80 dark:bg-white/[0.04] border border-black/5 dark:border-white/10 transition-all duration-200 focus-within:ring-2 focus-within:ring-indigo-500/25 focus-within:border-indigo-500/40 shadow-sm overflow-hidden">
+                <div className="relative flex items-center rounded-2xl bg-white/85 dark:bg-[#1b1d25]/85 border border-white/70 dark:border-white/12 transition-all duration-200 focus-within:ring-2 focus-within:ring-indigo-500/30 focus-within:border-indigo-400/60 shadow-xl shadow-black/5 dark:shadow-black/25 backdrop-blur-xl overflow-hidden">
                   <button
                     type="button"
                     onClick={() =>
                       onOpen("messageFile", { apiUrl, query })
                     }
-                    className="ml-3 h-7 w-7 rounded-full bg-zinc-400 dark:bg-zinc-600 hover:bg-indigo-500 dark:hover:bg-indigo-500 transition-colors flex items-center justify-center text-white focus:outline-none flex-shrink-0"
+                    className="ml-2.5 h-8 w-8 rounded-xl bg-zinc-200 text-zinc-600 hover:bg-indigo-500 hover:text-white dark:bg-white/[0.09] dark:text-zinc-300 dark:hover:bg-indigo-500 transition-colors flex items-center justify-center focus:outline-none flex-shrink-0"
                   >
                     <Plus className="h-4 w-4" />
                   </button>
@@ -81,16 +81,23 @@ export function ChatInput({ apiUrl, query, name, type }: ChatInputProps) {
                       type === "conversation" ? "@" + name : "#" + name
                     }...`}
                     disabled={isLoading}
-                    className="py-6 px-3 bg-transparent border-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-zinc-700 dark:text-zinc-200 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 text-sm font-normal"
+                    className="h-12 px-3 bg-transparent border-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-zinc-700 dark:text-zinc-100 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 text-sm font-normal"
                     {...field}
                   />
-                  <div className="mr-3 flex-shrink-0">
+                  <div className="mr-1.5 flex-shrink-0">
                     <EmojiPicker
                       onChange={(emoji: string) =>
                         field.onChange(`${field.value} ${emoji}`)
                       }
                     />
                   </div>
+                  <button
+                    type="submit"
+                    disabled={isLoading || !field.value.trim()}
+                    className="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-500 text-white shadow-md shadow-indigo-500/25 transition hover:bg-indigo-600 disabled:cursor-not-allowed disabled:bg-zinc-300 disabled:text-zinc-500 disabled:shadow-none dark:disabled:bg-white/[0.07] dark:disabled:text-zinc-500"
+                  >
+                    <SendHorizonal className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </FormControl>
             </FormItem>

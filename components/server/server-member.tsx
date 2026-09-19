@@ -36,20 +36,23 @@ export const ServerMember = ({ member, server }: ServerMemberProps) => {
     <button
       onClick={onClick}
       className={cn(
-        "group px-2.5 py-1.5 rounded-lg flex items-center gap-x-2.5 w-full transition-all duration-150 focus:outline-none",
+        "group relative px-2.5 py-1.5 rounded-md flex items-center gap-x-2 w-full transition-all duration-150 focus:outline-none",
         !isActive &&
           "hover:bg-zinc-200/60 dark:hover:bg-white/[0.04] text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200",
         isActive &&
-          "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-semibold shadow-sm"
+          "bg-indigo-500/10 dark:bg-indigo-500/12 text-indigo-600 dark:text-indigo-300 font-semibold"
       )}
     >
+      {isActive && (
+        <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />
+      )}
       <UserAvatar
         src={member.profile.imageUrl}
-        className="h-7 w-7 md:h-7 md:w-7 ring-1 ring-black/5 dark:ring-white/10"
+        className="h-6 w-6 md:h-6 md:w-6 ring-1 ring-black/5 dark:ring-white/10"
       />
       <p
         className={cn(
-          "line-clamp-1 text-sm tracking-tight transition-colors",
+          "line-clamp-1 text-[13px] tracking-tight transition-colors",
           !isActive && "group-hover:text-zinc-700 dark:group-hover:text-zinc-200",
           isActive && "text-indigo-600 dark:text-indigo-300 font-medium"
         )}

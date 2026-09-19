@@ -36,7 +36,7 @@ export function ServerHeader({ server, role }: ServerHeaderProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="focus:outline-none" asChild>
-        <button className="w-full font-bold text-sm md:text-base px-4 flex items-center h-12 border-b border-black/5 dark:border-white/5 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors duration-200 text-zinc-800 dark:text-zinc-100">
+        <button className="w-full font-bold text-sm px-3.5 flex items-center h-12 border-b border-black/5 dark:border-white/10 bg-white/70 dark:bg-white/[0.045] hover:bg-white/90 dark:hover:bg-white/[0.07] transition-colors duration-200 text-zinc-800 dark:text-zinc-100">
           <span className="truncate">{server.name}</span>
           <ChevronDown className="h-4 w-4 ml-auto text-zinc-500 transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </button>

@@ -65,7 +65,7 @@ export function ServerSearch({ data }: ServerSearchProps) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="group px-3 py-1.5 rounded-lg items-center flex gap-x-2.5 w-full bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/5 hover:border-indigo-500/40 dark:hover:border-indigo-500/40 transition duration-200 shadow-sm focus:outline-none"
+        className="group px-3 py-2 rounded-xl items-center flex gap-x-2.5 w-full bg-white/75 dark:bg-white/[0.055] border border-black/5 dark:border-white/10 hover:border-indigo-500/45 dark:hover:border-indigo-500/45 transition duration-200 shadow-sm shadow-black/5 focus:outline-none"
       >
         <Search className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 group-hover:text-indigo-500 transition-colors" />
         <p className="font-medium text-xs text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200 transition">

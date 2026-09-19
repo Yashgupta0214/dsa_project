@@ -20,20 +20,20 @@ export function ChatHeader({
   imageUrl
 }: ChatHeaderProps) {
   return (
-    <div className="text-md font-semibold px-4 flex items-center h-12 border-b border-black/5 dark:border-white/5 bg-white/75 dark:bg-[#1e1f22]/80 backdrop-blur-md sticky top-0 z-20 shadow-sm transition-colors">
+    <div className="text-md font-semibold mx-3 mt-3 mb-2 px-3.5 flex items-center h-12 rounded-xl border border-white/70 dark:border-white/10 bg-white/80 dark:bg-[#1b1d25]/75 backdrop-blur-xl sticky top-3 z-20 shadow-lg shadow-black/5 dark:shadow-black/25 transition-colors">
       <MobileToggle serverId={serverId} />
       {type === "channel" && (
-        <div className="p-1 rounded-md bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 mr-2.5">
-          <Hash className="w-4 h-4" />
+        <div className="p-1.5 rounded-lg bg-indigo-500 text-white mr-2 shadow-sm shadow-indigo-500/30">
+          <Hash className="w-3.5 h-3.5" />
         </div>
       )}
       {type === "conversation" && (
         <UserAvatar
           src={imageUrl}
-          className="h-8 w-8 md:h-8 md:w-8 mr-2.5 ring-1 ring-black/5 dark:ring-white/10"
+          className="h-7 w-7 md:h-7 md:w-7 mr-2 ring-1 ring-black/5 dark:ring-white/10"
         />
       )}
-      <p className="font-bold text-sm md:text-base tracking-tight text-zinc-800 dark:text-zinc-100">
+      <p className="font-bold text-sm tracking-tight text-zinc-800 dark:text-zinc-100">
         {name}
       </p>
       <div className="ml-auto flex items-center gap-x-3">

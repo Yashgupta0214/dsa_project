@@ -128,8 +128,8 @@ export function ChatItem({
 
   return (
     <div className="relative group w-full px-3">
-      <div className="absolute left-5 top-0 bottom-0 w-px bg-zinc-300/70 dark:bg-white/15" />
-      <div className="relative ml-3 flex gap-x-2.5 items-start w-full border-t border-zinc-300/60 dark:border-white/10 py-1.5 transition-colors duration-150 hover:bg-black/[0.02] dark:hover:bg-white/[0.025]">
+      <div className="absolute left-5 top-0 bottom-0 w-px bg-indigo-300/70 dark:bg-indigo-300/25" />
+      <div className="relative ml-3 flex gap-x-2.5 items-start w-full border-t border-zinc-300/60 py-2 transition-colors duration-150 hover:bg-white/45 dark:border-white/10 dark:hover:bg-white/[0.04]">
         <div
           onClick={onMemberClick}
           className="cursor-pointer hover:drop-shadow-md transition pt-0.5 flex-shrink-0"
@@ -184,7 +184,7 @@ export function ChatItem({
           {!fileUrl && !isEditing && (
             <p
               className={cn(
-                "text-sm text-zinc-700 dark:text-zinc-300 font-normal leading-snug mt-0.5",
+                "text-sm text-zinc-700 dark:text-zinc-200 font-normal leading-snug mt-0.5",
                 deleted &&
                   "italic text-zinc-400 dark:text-zinc-500 text-xs mt-0.5"
               )}

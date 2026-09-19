@@ -75,10 +75,10 @@ export async function ServerSidebar({ serverId }: { serverId: string }) {
   )?.role;
 
   return (
-    <div className="flex flex-col h-full text-primary w-full dark:bg-[#18191c]/95 bg-[#f4f5f7] border-r border-black/5 dark:border-white/5 backdrop-blur-md">
+    <div className="flex flex-col h-full text-primary w-full bg-white/70 dark:bg-[#14161d]/82 border-r border-black/5 dark:border-white/10 backdrop-blur-xl shadow-xl shadow-black/5 dark:shadow-black/25">
       <ServerHeader server={server} role={role} />
-      <ScrollArea className="flex-1 px-3">
-        <div className="mt-2.5">
+      <ScrollArea className="flex-1 px-2.5">
+        <div className="mt-2">
           <ServerSearch
             data={[
               {
@@ -120,16 +120,16 @@ export async function ServerSidebar({ serverId }: { serverId: string }) {
             ]}
           />
         </div>
-        <Separator className="bg-zinc-200/80 dark:bg-white/[0.06] rounded-full my-3" />
+        <Separator className="bg-zinc-200/80 dark:bg-white/[0.06] rounded-full my-2.5" />
         {!!textChannels?.length && (
-          <div className="mb-2">
+          <div className="mb-2.5">
             <ServerSection
               sectionType="channels"
               channelType={ChannelType.TEXT}
               role={role}
               label="Text Channels"
             />
-            <div className="space-y-[3px]">
+            <div className="space-y-0.5">
               {textChannels.map((channel) => (
                 <ServerChannel
                   key={channel.id}
@@ -142,14 +142,14 @@ export async function ServerSidebar({ serverId }: { serverId: string }) {
           </div>
         )}
         {!!audioChannels?.length && (
-          <div className="mb-2">
+          <div className="mb-2.5">
             <ServerSection
               sectionType="channels"
               channelType={ChannelType.AUDIO}
               role={role}
               label="Voice Channels"
             />
-            <div className="space-y-[3px]">
+            <div className="space-y-0.5">
               {audioChannels.map((channel) => (
                 <ServerChannel
                   key={channel.id}
@@ -162,14 +162,14 @@ export async function ServerSidebar({ serverId }: { serverId: string }) {
           </div>
         )}
         {!!videoChannels?.length && (
-          <div className="mb-2">
+          <div className="mb-2.5">
             <ServerSection
               sectionType="channels"
               channelType={ChannelType.VIDEO}
               role={role}
               label="Video Channels"
             />
-            <div className="space-y-[3px]">
+            <div className="space-y-0.5">
               {videoChannels.map((channel) => (
                 <ServerChannel
                   key={channel.id}
@@ -182,14 +182,14 @@ export async function ServerSidebar({ serverId }: { serverId: string }) {
           </div>
         )}
         {!!members?.length && (
-          <div className="mb-2">
+          <div className="mb-2.5">
             <ServerSection
               sectionType="members"
               role={role}
               label="Members"
               server={server}
             />
-            <div className="space-y-[3px]">
+            <div className="space-y-0.5">
               {members.map((member) => (
                 <ServerMember key={member.id} member={member} server={server} />
               ))}

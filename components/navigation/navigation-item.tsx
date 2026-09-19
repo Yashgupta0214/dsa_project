@@ -32,18 +32,18 @@ export function NavigationItem({ id, imageUrl, name }: NavigationItemProps) {
         {/* Active/Hover Left Pill Indicator */}
         <div
           className={cn(
-            "absolute left-0 bg-indigo-500 dark:bg-white rounded-r-full transition-all duration-300 ease-out",
-            !isActive && "w-[4px] h-[0px] group-hover:h-[20px] opacity-70",
-            isActive && "w-[4px] h-[36px] opacity-100 shadow-[0_0_10px_rgba(99,102,241,0.6)]"
+            "absolute left-0 bg-indigo-500 dark:bg-indigo-400 rounded-r-full transition-all duration-300 ease-out",
+            !isActive && "w-[3px] h-[0px] group-hover:h-[18px] opacity-70",
+            isActive && "w-[3px] h-[32px] opacity-100 shadow-[0_0_10px_rgba(99,102,241,0.45)]"
           )}
         />
 
         {/* Server Icon Container */}
         <div
           className={cn(
-            "relative flex mx-3 h-[48px] w-[48px] rounded-[24px] group-hover:rounded-[16px] transition-all duration-300 ease-out overflow-hidden items-center justify-center group-hover:scale-105 active:scale-95 border border-black/5 dark:border-white/5",
+            "relative flex mx-3 h-[44px] w-[44px] rounded-[18px] group-hover:rounded-[14px] transition-all duration-300 ease-out overflow-hidden items-center justify-center group-hover:scale-105 active:scale-95 border border-black/5 dark:border-white/5 shadow-sm",
             isActive &&
-              "rounded-[16px] ring-2 ring-indigo-500/50 ring-offset-2 ring-offset-[#e3e5e8] dark:ring-offset-[#18191c] shadow-md shadow-indigo-500/20"
+              "rounded-[14px] ring-2 ring-indigo-500/45 ring-offset-2 ring-offset-[#eef0f3] dark:ring-offset-[#0f1014] shadow-md shadow-indigo-500/20"
           )}
         >
           <Image

@@ -27,12 +27,12 @@ export async function NavigationSidebar() {
   });
 
   return (
-    <div className="space-y-4 flex flex-col h-full items-center text-primary w-full dark:bg-[#111214] bg-[#e3e5e8] py-3 border-r border-black/5 dark:border-white/5 shadow-inner">
+    <div className="space-y-3 flex flex-col h-full items-center text-primary w-full bg-[linear-gradient(180deg,#eef2ff_0%,#e2e8f0_100%)] dark:bg-[linear-gradient(180deg,#10121a_0%,#0b0c11_100%)] py-2.5 border-r border-black/5 dark:border-white/10 shadow-inner">
       <NavigationAction />
-      <Separator className="h-[2px] bg-zinc-300 dark:bg-zinc-800 rounded-full w-8 mx-auto" />
+      <Separator className="h-px bg-zinc-300 dark:bg-white/10 rounded-full w-8 mx-auto" />
       <ScrollArea className="flex-1 w-full">
         {servers.map((server) => (
-          <div key={server.id} className="mb-3">
+          <div key={server.id} className="mb-2">
             <NavigationItem
               id={server.id}
               imageUrl={server.imageUrl}
@@ -41,7 +41,7 @@ export async function NavigationSidebar() {
           </div>
         ))}
       </ScrollArea>
-      <div className="pb-3 mt-auto flex items-center flex-col gap-y-4 pt-2 border-t border-black/5 dark:border-white/5 w-full">
+      <div className="pb-2 mt-auto flex items-center flex-col gap-y-3 pt-2 border-t border-black/5 dark:border-white/5 w-full">
         <ModeToggle />
         <div className="p-1 rounded-full hover:ring-2 hover:ring-indigo-500/30 transition">
           <UserButton
