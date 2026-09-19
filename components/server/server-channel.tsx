@@ -31,53 +31,63 @@ export function ServerChannel({
   const router = useRouter();
 
   const Icon = iconMap[channel.type];
+  const isActive = params?.channelId === channel.id;
 
   const onClick = () =>
     router.push(`/servers/${params?.serverId}/channels/${channel.id}`);
 
   const onAction = (e: React.MouseEvent, action: ModalType) => {
     e.stopPropagation();
-
     onOpen(action, { channel, server });
   };
 
   return (
     <button
       className={cn(
-        "group px-2 py-2 rounded-md flex items-center gap-x-2 w-full hover:bg-zinc-700/10 dark:hover:bg-zinc-700/50 transition mb-1",
-        params?.channelId === channel.id &&
-          "bg-zinc-700/20 dark:bg-zinc-700"
+        "group px-2.5 py-1.5 rounded-lg flex items-center gap-x-2.5 w-full transition-all duration-150 focus:outline-none",
+        !isActive &&
+          "hover:bg-zinc-200/60 dark:hover:bg-white/[0.04] text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200",
+        isActive &&
+          "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-semibold shadow-sm"
       )}
       onClick={onClick}
     >
-      <Icon className="flex-shrink-0 w-5 h-5 text-zinc-500 dark:text-zinc-400" />
+      <Icon
+        className={cn(
+          "flex-shrink-0 w-4 h-4 transition-colors",
+          !isActive && "text-zinc-400 group-hover:text-zinc-500 dark:text-zinc-500 dark:group-hover:text-zinc-300",
+          isActive && channel.type === ChannelType.TEXT && "text-indigo-500 dark:text-indigo-400",
+          isActive && channel.type === ChannelType.AUDIO && "text-emerald-500 dark:text-emerald-400",
+          isActive && channel.type === ChannelType.VIDEO && "text-amber-500 dark:text-amber-400"
+        )}
+      />
       <p
         className={cn(
-          "line-clamp-1 font-semibold text-sm text-zinc-500 group-hover:text-zinc-600 dark:text-zinc-400 dark:group-hover:text-zinc-300 transition",
-          params?.channelId === channel.id &&
-            "text-primary dark:text-zinc-200 dark:group-hover:text-white"
+          "line-clamp-1 text-sm tracking-tight transition-colors",
+          !isActive && "group-hover:text-zinc-700 dark:group-hover:text-zinc-200",
+          isActive && "text-indigo-600 dark:text-indigo-300 font-medium"
         )}
       >
         {channel.name}
       </p>
       {channel.name !== "general" && role !== MemberRole.GUEST && (
-        <div className="ml-auto flex items-center gap-x-2">
+        <div className="ml-auto flex items-center gap-x-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <ActionTooltip label="Edit">
             <Edit
               onClick={(e) => onAction(e, "editChannel")}
-              className="hidden group-hover:block w-4 h-4 text-zinc-500 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-300 transition"
+              className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-200 transition"
             />
           </ActionTooltip>
           <ActionTooltip label="Delete">
             <Trash
               onClick={(e) => onAction(e, "deleteChannel")}
-              className="hidden group-hover:block w-4 h-4 text-zinc-500 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-300 transition"
+              className="w-3.5 h-3.5 text-zinc-400 hover:text-rose-500 dark:text-zinc-500 dark:hover:text-rose-400 transition"
             />
           </ActionTooltip>
         </div>
       )}
       {channel.name === "general" && (
-        <Lock className="ml-auto w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+        <Lock className="ml-auto w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
       )}
     </button>
   );

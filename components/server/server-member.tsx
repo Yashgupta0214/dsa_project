@@ -15,10 +15,10 @@ interface ServerMemberProps {
 const roleIconMap = {
   [MemberRole.GUEST]: null,
   [MemberRole.MODERATOR]: (
-    <ShieldCheck className="h-4 w-4 ml-2 text-indigo-500" />
+    <ShieldCheck className="h-4 w-4 ml-auto text-indigo-500" />
   ),
   [MemberRole.ADMIN]: (
-    <ShieldAlert className="h-4 w-4 ml-2 text-rose-500" />
+    <ShieldAlert className="h-4 w-4 ml-auto text-rose-500" />
   )
 };
 
@@ -27,6 +27,7 @@ export const ServerMember = ({ member, server }: ServerMemberProps) => {
   const router = useRouter();
 
   const icon = roleIconMap[member.role];
+  const isActive = params?.memberId === member.id;
 
   const onClick = () =>
     router.push(`/servers/${params?.serverId}/conversations/${member.id}`);
@@ -35,19 +36,22 @@ export const ServerMember = ({ member, server }: ServerMemberProps) => {
     <button
       onClick={onClick}
       className={cn(
-        "group px-2 py-2 rounded-md flex items-center gap-x-2 w-full hover:bg-zinc-700/10 dark:hover:bg-zinc-700/50 transition mb-1",
-        params?.memberId === member.id && "bg-zinc-700/20 dark:bg-zinc-700"
+        "group px-2.5 py-1.5 rounded-lg flex items-center gap-x-2.5 w-full transition-all duration-150 focus:outline-none",
+        !isActive &&
+          "hover:bg-zinc-200/60 dark:hover:bg-white/[0.04] text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200",
+        isActive &&
+          "bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-semibold shadow-sm"
       )}
     >
       <UserAvatar
         src={member.profile.imageUrl}
-        className="h-8 w-8 md:h-8 md:w-8"
+        className="h-7 w-7 md:h-7 md:w-7 ring-1 ring-black/5 dark:ring-white/10"
       />
       <p
         className={cn(
-          "font-semibold text-sm text-zinc-500 group-hover:text-zinc-600 dark:text-zinc-400 dark:group-hover:text-zinc-300 transition",
-          params?.memberId === member.id &&
-            "text-primary dark:text-zinc-200 dark:group-hover:text-white"
+          "line-clamp-1 text-sm tracking-tight transition-colors",
+          !isActive && "group-hover:text-zinc-700 dark:group-hover:text-zinc-200",
+          isActive && "text-indigo-600 dark:text-indigo-300 font-medium"
         )}
       >
         {member.profile.name}

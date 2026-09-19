@@ -36,65 +36,67 @@ export function ServerHeader({ server, role }: ServerHeaderProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="focus:outline-none" asChild>
-        <button className="w-full text-md font-semibold px-3 flex items-center h-12 border-neutral-200 dark:border-neutral-800 border-b-2 hover:bg-zinc-700/10 dark:hover:bg-zinc-700/50 transition">
-          {server.name}
-          <ChevronDown className="h-5 w-5 ml-auto" />
+        <button className="w-full font-bold text-sm md:text-base px-4 flex items-center h-12 border-b border-black/5 dark:border-white/5 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors duration-200 text-zinc-800 dark:text-zinc-100">
+          <span className="truncate">{server.name}</span>
+          <ChevronDown className="h-4 w-4 ml-auto text-zinc-500 transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56 text-xs font-medium text-black dark:text-neutral-400 space-y-[2px]">
+      <DropdownMenuContent className="w-56 text-xs font-medium rounded-xl p-1.5 shadow-2xl space-y-1 bg-white/95 dark:bg-[#1e1f22]/95 backdrop-blur-xl border border-black/10 dark:border-white/10">
         {isModerator && (
           <DropdownMenuItem
             onClick={() => onOpen("invite", { server })}
-            className="text-indigo-600 dark:text-indigo-400 px-3 py-2 text-sm cursor-pointer"
+            className="text-indigo-600 dark:text-indigo-400 px-3 py-2 text-xs font-semibold cursor-pointer rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition"
           >
             Invite People
-            <UserPlus className="h-4 w-4 ml-auto" />
+            <UserPlus className="h-4 w-4 ml-auto text-indigo-500" />
           </DropdownMenuItem>
         )}
         {isAdmin && (
           <DropdownMenuItem
             onClick={() => onOpen("editServer", { server })}
-            className="px-3 py-2 text-sm cursor-pointer"
+            className="px-3 py-2 text-xs cursor-pointer rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
           >
             Server Settings
-            <Settings className="h-4 w-4 ml-auto" />
+            <Settings className="h-4 w-4 ml-auto text-zinc-400" />
           </DropdownMenuItem>
         )}
         {isAdmin && (
           <DropdownMenuItem
             onClick={() => onOpen("members", { server })}
-            className="px-3 py-2 text-sm cursor-pointer"
+            className="px-3 py-2 text-xs cursor-pointer rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
           >
             Manage Members
-            <Users className="h-4 w-4 ml-auto" />
+            <Users className="h-4 w-4 ml-auto text-zinc-400" />
           </DropdownMenuItem>
         )}
         {isModerator && (
           <DropdownMenuItem
             onClick={() => onOpen("createChannel")}
-            className="px-3 py-2 text-sm cursor-pointer"
+            className="px-3 py-2 text-xs cursor-pointer rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
           >
             Create Channel
-            <PlusCircle className="h-4 w-4 ml-auto" />
+            <PlusCircle className="h-4 w-4 ml-auto text-zinc-400" />
           </DropdownMenuItem>
         )}
-        {isModerator && <DropdownMenuSeparator />}
+        {isModerator && (
+          <DropdownMenuSeparator className="bg-black/5 dark:bg-white/5 my-1" />
+        )}
         {isAdmin && (
           <DropdownMenuItem
             onClick={() => onOpen("deleteServer", { server })}
-            className="px-3 py-2 text-sm cursor-pointer text-rose-500"
+            className="px-3 py-2 text-xs cursor-pointer text-rose-500 hover:bg-rose-500/10 rounded-lg transition"
           >
             Delete Server
-            <Trash className="h-4 w-4 ml-auto" />
+            <Trash className="h-4 w-4 ml-auto text-rose-500" />
           </DropdownMenuItem>
         )}
         {!isAdmin && (
           <DropdownMenuItem
             onClick={() => onOpen("leaveServer", { server })}
-            className="px-3 py-2 text-sm cursor-pointer text-rose-500"
+            className="px-3 py-2 text-xs cursor-pointer text-rose-500 hover:bg-rose-500/10 rounded-lg transition"
           >
             Leave Server
-            <LogOutIcon className="h-4 w-4 ml-auto" />
+            <LogOutIcon className="h-4 w-4 ml-auto text-rose-500" />
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>

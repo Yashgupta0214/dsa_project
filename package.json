@@ -66,5 +66,8 @@
   "devDependencies": {
     "@types/uuid": "^9.0.2",
     "prisma": "^5.2.0"
+  },
+  "optionalDependencies": {
+    "@next/swc-win32-x64-msvc": "^13.4.12"
   }
 }

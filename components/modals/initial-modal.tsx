@@ -29,12 +29,11 @@ import { FileUpload } from "@/components/file-upload";
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Server name is required." }),
-  imageUrl: z.string().optional()
+  imageUrl: z.string().min(1, { message: "Server image is required." })
 });
 
 export function InitialModal() {
   const [isMounted, setIsMounted] = useState(false);
-
   const router = useRouter();
 
   const form = useForm({
@@ -67,19 +66,19 @@ export function InitialModal() {
 
   return (
     <Dialog open>
-      <DialogContent className="bg-white text-black p-0 overflow-hidden">
+      <DialogContent className="bg-white dark:bg-[#1e1f22] text-zinc-900 dark:text-zinc-100 p-0 overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 shadow-2xl">
         <DialogHeader className="pt-8 px-6">
-          <DialogTitle className="text-2xl text-center font-bold">
-            Customize your server
+          <DialogTitle className="text-2xl text-center font-extrabold tracking-tight text-zinc-900 dark:text-white">
+            Customize your first server
           </DialogTitle>
-          <DialogDescription className="text-center text-zinc-500">
+          <DialogDescription className="text-center text-zinc-500 dark:text-zinc-400 text-sm mt-1">
             Give your server a personality with a name and an image. You can
             always change it later.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <div className="space-y-8 px-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="space-y-6 px-6">
               <div className="flex items-center justify-center text-center">
                 <FormField
                   control={form.control}
@@ -102,24 +101,27 @@ export function InitialModal() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="uppercase text-xs font-bold text-zinc-500 dark:text-secondary/70">
+                    <FormLabel className="uppercase text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider">
                       Server Name
                     </FormLabel>
                     <FormControl>
                       <Input
                         disabled={isLoading}
                         placeholder="Enter server name"
-                        className="bg-zinc-300/50 border-0 focus-visible: ring-0 text-black focus-visible:ring-offset-0"
+                        className="bg-zinc-100 dark:bg-white/[0.06] border border-black/5 dark:border-white/10 focus-visible:ring-2 focus-visible:ring-indigo-500 text-zinc-900 dark:text-white rounded-xl placeholder:text-zinc-400 py-5"
                         {...field}
                       />
                     </FormControl>
-                    <FormMessage />
+                    <FormMessage className="text-xs text-rose-500" />
                   </FormItem>
                 )}
               />
             </div>
-            <DialogFooter className="bg-gray-100 px-6 py-4">
-              <Button disabled={isLoading} variant="primary">
+            <DialogFooter className="bg-zinc-50 dark:bg-[#18191c] px-6 py-4 border-t border-black/5 dark:border-white/5">
+              <Button
+                disabled={isLoading}
+                className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-md shadow-indigo-500/20 px-6 py-2 transition"
+              >
                 Create
               </Button>
             </DialogFooter>

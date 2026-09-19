@@ -20,21 +20,23 @@ export function ChatHeader({
   imageUrl
 }: ChatHeaderProps) {
   return (
-    <div className="text-md font-semibold px-3 flex items-center h-12 border-neutral-200 dark:border-neutral-800 border-b-2">
+    <div className="text-md font-semibold px-4 flex items-center h-12 border-b border-black/5 dark:border-white/5 bg-white/75 dark:bg-[#1e1f22]/80 backdrop-blur-md sticky top-0 z-20 shadow-sm transition-colors">
       <MobileToggle serverId={serverId} />
       {type === "channel" && (
-        <Hash className="w-5 h-5 text-zinc-500 dark:text-zinc-400 mr-2" />
+        <div className="p-1 rounded-md bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 mr-2.5">
+          <Hash className="w-4 h-4" />
+        </div>
       )}
       {type === "conversation" && (
         <UserAvatar
           src={imageUrl}
-          className="h-8 w-8 md:h-8 md:w-8 mr-2"
+          className="h-8 w-8 md:h-8 md:w-8 mr-2.5 ring-1 ring-black/5 dark:ring-white/10"
         />
       )}
-      <p className="font-semibold text-md text-black dark:text-white">
+      <p className="font-bold text-sm md:text-base tracking-tight text-zinc-800 dark:text-zinc-100">
         {name}
       </p>
-      <div className="ml-auto flex items-center">
+      <div className="ml-auto flex items-center gap-x-3">
         {type === "conversation" && <ChatVideoButton />}
         <SocketIndicatior />
       </div>

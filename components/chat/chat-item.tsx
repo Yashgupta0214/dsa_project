@@ -45,8 +45,8 @@ interface ChatItemProps {
 
 const roleIconMap = {
   GUEST: null,
-  MODERATOR: <ShieldCheck className="h-4 w-4 ml-2 text-indigo-500" />,
-  ADMIN: <ShieldAlert className="h-4 w-4 ml-2 text-rose-500" />
+  MODERATOR: <ShieldCheck className="h-3.5 w-3.5 ml-1.5 text-indigo-500" />,
+  ADMIN: <ShieldAlert className="h-3.5 w-3.5 ml-1.5 text-rose-500" />
 };
 
 const formSchema = z.object({
@@ -73,7 +73,6 @@ export function ChatItem({
 
   const onMemberClick = () => {
     if (member.id === currentMember.id) return;
-
     router.push(`/servers/${params?.serverId}/conversations/${member.id}`);
   };
 
@@ -85,7 +84,6 @@ export function ChatItem({
     };
 
     window.addEventListener("keydown", handleKeyDown);
-
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
@@ -129,20 +127,23 @@ export function ChatItem({
   const isImage = !isPDF && fileUrl;
 
   return (
-    <div className="relative group flex items-center hover:bg-black/5 p-4 transition w-full">
-      <div className="group flex gap-x-2 items-center w-full">
+    <div className="relative group flex items-start hover:bg-black/[0.03] dark:hover:bg-white/[0.02] px-4 py-2 transition-colors duration-150 w-full rounded-xl">
+      <div className="group flex gap-x-3 items-start w-full">
         <div
           onClick={onMemberClick}
-          className="cursor-pointer hover:drop-shadow-md transition"
+          className="cursor-pointer hover:drop-shadow-md transition pt-0.5 flex-shrink-0"
         >
-          <UserAvatar src={member.profile.imageUrl} />
+          <UserAvatar
+            src={member.profile.imageUrl}
+            className="h-8 w-8 md:h-9 md:w-9 ring-1 ring-black/5 dark:ring-white/10"
+          />
         </div>
         <div className="flex flex-col w-full">
           <div className="flex items-center gap-x-2">
             <div className="flex items-center">
               <p
                 onClick={onMemberClick}
-                className="font-semibold text-sm hover:underline cursor-pointer"
+                className="font-bold text-sm hover:underline cursor-pointer tracking-tight text-zinc-900 dark:text-zinc-100"
               >
                 {member.profile.name}
               </p>
@@ -150,7 +151,7 @@ export function ChatItem({
                 {roleIconMap[member.role]}
               </ActionTooltip>
             </div>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
               {timestamp}
             </span>
           </div>
@@ -159,7 +160,7 @@ export function ChatItem({
               href={fileUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="relative aspect-square rounded-md mt-2 overflow-hidden border flex items-center bg-secondary h-48 w-48"
+              className="relative aspect-square rounded-2xl mt-2 overflow-hidden border border-black/5 dark:border-white/10 flex items-center bg-secondary h-52 w-52 shadow-md hover:scale-[1.01] transition-transform duration-200"
             >
               <Image
                 src={fileUrl}
@@ -170,29 +171,29 @@ export function ChatItem({
             </a>
           )}
           {isPDF && (
-            <div className="relative flex items-center p-2 mt-2 rounded-md bg-background/10">
-              <FileIcon className="h-10 w-10 fill-indigo-200 stroke-indigo-400" />
+            <div className="relative flex items-center p-3 mt-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/10 w-fit">
+              <FileIcon className="h-8 w-8 fill-indigo-200 stroke-indigo-500" />
               <a
                 href={fileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-2 text-sm text-indigo-500 dark:text-indigo-400 hover:underline"
+                className="ml-2 text-xs font-semibold text-indigo-500 dark:text-indigo-400 hover:underline"
               >
-                PDF File
+                PDF Document
               </a>
             </div>
           )}
           {!fileUrl && !isEditing && (
             <p
               className={cn(
-                "text-sm text-zinc-600 dark:text-zinc-300",
+                "text-sm text-zinc-700 dark:text-zinc-300 font-normal leading-relaxed mt-0.5",
                 deleted &&
-                  "italic to-zinc-500 dark:text-zinc-400 text-xs mt-1"
+                  "italic text-zinc-400 dark:text-zinc-500 text-xs mt-1"
               )}
             >
               {content}
               {isUpdated && !deleted && (
-                <span className="text-[10px] mx-2 text-zinc-500 dark:text-zinc-400">
+                <span className="text-[10px] mx-1.5 text-zinc-400 dark:text-zinc-500 font-medium">
                   (edited)
                 </span>
               )}
@@ -214,7 +215,7 @@ export function ChatItem({
                           <Input
                             disabled={isLoading}
                             placeholder="Edited message"
-                            className="p-2 bg-zinc-200/90 dark:bg-zinc-700/75 border-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-zinc-600 dark:text-zinc-200"
+                            className="p-2.5 bg-zinc-200/90 dark:bg-white/[0.06] border border-black/5 dark:border-white/10 focus-visible:ring-1 focus-visible:ring-indigo-500 rounded-xl text-zinc-800 dark:text-zinc-200 text-sm"
                             {...field}
                           />
                         </div>
@@ -222,7 +223,12 @@ export function ChatItem({
                     </FormItem>
                   )}
                 />
-                <Button disabled={isLoading} size="sm" variant="primary">
+                <Button
+                  disabled={isLoading}
+                  size="sm"
+                  variant="primary"
+                  className="rounded-xl px-4 font-semibold shadow-md shadow-indigo-500/20"
+                >
                   Save
                 </Button>
               </form>
@@ -234,25 +240,29 @@ export function ChatItem({
         </div>
       </div>
       {canDeleteMessage && (
-        <div className="hidden group-hover:flex items-center gap-x-2 absolute p-1 -top-2 right-5 bg-white dark:bg-zinc-800 border rounded-sm">
+        <div className="hidden group-hover:flex items-center gap-x-1 absolute p-1 -top-3 right-4 bg-white/95 dark:bg-[#18191c]/95 border border-black/10 dark:border-white/10 rounded-lg shadow-lg backdrop-blur-md">
           {canEditMessage && (
             <ActionTooltip label="Edit">
-              <Edit
+              <button
                 onClick={() => setIsEditing(true)}
-                className="cursor-pointer ml-auto w-4 h-4 text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition"
-              />
+                className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition"
+              >
+                <Edit className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200" />
+              </button>
             </ActionTooltip>
           )}
           <ActionTooltip label="Delete">
-            <Trash
+            <button
               onClick={() =>
                 onOpen("deleteMessage", {
                   apiUrl: `${socketUrl}/${id}`,
                   query: socketQuery
                 })
               }
-              className="cursor-pointer ml-auto w-4 h-4 text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition"
-            />
+              className="p-1 rounded hover:bg-rose-500/10 transition"
+            >
+              <Trash className="w-3.5 h-3.5 text-zinc-400 hover:text-rose-500" />
+            </button>
           </ActionTooltip>
         </div>
       )}

@@ -56,40 +56,47 @@ export function InviteModal() {
 
   return (
     <Dialog open={isModalOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-white text-black p-0 overflow-hidden">
+      <DialogContent className="bg-white dark:bg-[#1e1f22] text-zinc-900 dark:text-zinc-100 p-0 overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 shadow-2xl">
         <DialogHeader className="pt-8 px-6">
-          <DialogTitle className="text-2xl text-center font-bold">
+          <DialogTitle className="text-2xl text-center font-extrabold tracking-tight text-zinc-900 dark:text-white">
             Invite Friends
           </DialogTitle>
         </DialogHeader>
-        <div className="p-6">
-          <Label className="uppercase text-xs font-bold text-zinc-500 dark:text-secondary/70">
-            Server invite link
-          </Label>
-          <div className="flex items-center mt-2 gap-x-2">
-            <Input
-              readOnly
-              disabled={isLoading}
-              value={inviteUrl}
-              className="bg-zinc-300/50 border-0 focus-visible:ring-0 text-black focus-visible:ring-offset-0"
-            />
-            <Button disabled={isLoading} onClick={onCopy} size="icon">
-              {copied ? (
-                <Check className="w-4 h-4" />
-              ) : (
-                <Copy className="w-4 h-4" />
-              )}
-            </Button>
+        <div className="p-6 space-y-4">
+          <div>
+            <Label className="uppercase text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider">
+              Server invite link
+            </Label>
+            <div className="flex items-center mt-2 gap-x-2">
+              <Input
+                readOnly
+                disabled={isLoading}
+                value={inviteUrl}
+                className="bg-zinc-100 dark:bg-white/[0.06] border border-black/5 dark:border-white/10 focus-visible:ring-2 focus-visible:ring-indigo-500 text-zinc-900 dark:text-white rounded-xl py-5 text-sm"
+              />
+              <Button
+                disabled={isLoading}
+                onClick={onCopy}
+                size="icon"
+                className="h-10 w-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/20 flex-shrink-0 transition"
+              >
+                {copied ? (
+                  <Check className="w-4 h-4 text-white" />
+                ) : (
+                  <Copy className="w-4 h-4 text-white" />
+                )}
+              </Button>
+            </div>
           </div>
           <Button
             disabled={isLoading}
             onClick={onNew}
             variant="link"
             size="sm"
-            className="text-xs text-zinc-500 mt-4"
+            className="text-xs text-indigo-500 hover:text-indigo-400 font-semibold p-0 transition flex items-center gap-1.5"
           >
             Generate a new link
-            <RefreshCw className="w-4 h-4 ml-2" />
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
           </Button>
         </div>
       </DialogContent>

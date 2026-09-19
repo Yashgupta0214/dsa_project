@@ -42,26 +42,35 @@ export function LeaveServerModal() {
 
   return (
     <Dialog open={isModalOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-white text-black p-0 overflow-hidden">
+      <DialogContent className="bg-white dark:bg-[#1e1f22] text-zinc-900 dark:text-zinc-100 p-0 overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 shadow-2xl">
         <DialogHeader className="pt-8 px-6">
-          <DialogTitle className="text-2xl text-center font-bold">
+          <DialogTitle className="text-2xl text-center font-extrabold tracking-tight text-zinc-900 dark:text-white">
             Leave Server
           </DialogTitle>
-          <DialogDescription className="text-center text-zinc-500">
-            Are you sure? You want to leave{" "}
+          <DialogDescription className="text-center text-zinc-500 dark:text-zinc-400 text-sm mt-1">
+            Are you sure you want to leave{" "}
             <span className="font-semibold text-indigo-500">
               {server?.name}
             </span>
-            ?
+            ? You will need a new invite link to rejoin.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="bg-gray-100 px-6 py-4">
+        <DialogFooter className="bg-zinc-50 dark:bg-[#18191c] px-6 py-4 border-t border-black/5 dark:border-white/5">
           <div className="flex items-center justify-between w-full">
-            <Button variant="ghost" disabled={isLoading} onClick={onClose}>
+            <Button
+              variant="ghost"
+              disabled={isLoading}
+              onClick={onClose}
+              className="rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
+            >
               Cancel
             </Button>
-            <Button variant="primary" disabled={isLoading} onClick={onClick}>
-              Confirm
+            <Button
+              disabled={isLoading}
+              onClick={onClick}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl shadow-md shadow-rose-500/20 px-6 py-2 transition"
+            >
+              Leave Server
             </Button>
           </div>
         </DialogFooter>
