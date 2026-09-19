@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useState
 } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { io as ClientIO } from "socket.io-client";
 
 type SocketContextType = {
@@ -27,10 +28,13 @@ export function SocketProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const { isLoaded, isSignedIn } = useAuth();
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
     const socketInstance = new (ClientIO as any)(
       process.env.NEXT_PUBLIC_SITE_URL!,
       {
@@ -49,8 +53,12 @@ export function SocketProvider({
 
     setSocket(socketInstance);
 
-    return () => socketInstance.disconnect();
-  }, []);
+    return () => {
+      socketInstance.disconnect();
+      setSocket(null);
+      setIsConnected(false);
+    };
+  }, [isLoaded, isSignedIn]);
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>
