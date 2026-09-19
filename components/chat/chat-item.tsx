@@ -127,23 +127,24 @@ export function ChatItem({
   const isImage = !isPDF && fileUrl;
 
   return (
-    <div className="relative group flex items-start hover:bg-black/[0.03] dark:hover:bg-white/[0.02] px-4 py-2 transition-colors duration-150 w-full rounded-xl">
-      <div className="group flex gap-x-3 items-start w-full">
+    <div className="relative group w-full px-3">
+      <div className="absolute left-5 top-0 bottom-0 w-px bg-zinc-300/70 dark:bg-white/15" />
+      <div className="relative ml-3 flex gap-x-2.5 items-start w-full border-t border-zinc-300/60 dark:border-white/10 py-1.5 transition-colors duration-150 hover:bg-black/[0.02] dark:hover:bg-white/[0.025]">
         <div
           onClick={onMemberClick}
           className="cursor-pointer hover:drop-shadow-md transition pt-0.5 flex-shrink-0"
         >
           <UserAvatar
             src={member.profile.imageUrl}
-            className="h-8 w-8 md:h-9 md:w-9 ring-1 ring-black/5 dark:ring-white/10"
+            className="h-7 w-7 md:h-7 md:w-7 ring-1 ring-black/5 dark:ring-white/10"
           />
         </div>
-        <div className="flex flex-col w-full">
-          <div className="flex items-center gap-x-2">
+        <div className="flex flex-col w-full min-w-0">
+          <div className="flex items-center gap-x-2 leading-none">
             <div className="flex items-center">
               <p
                 onClick={onMemberClick}
-                className="font-bold text-sm hover:underline cursor-pointer tracking-tight text-zinc-900 dark:text-zinc-100"
+                className="font-bold text-[13px] hover:underline cursor-pointer tracking-tight text-zinc-900 dark:text-zinc-100"
               >
                 {member.profile.name}
               </p>
@@ -151,16 +152,13 @@ export function ChatItem({
                 {roleIconMap[member.role]}
               </ActionTooltip>
             </div>
-            <span className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
-              {timestamp}
-            </span>
           </div>
           {isImage && (
             <a
               href={fileUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="relative aspect-square rounded-2xl mt-2 overflow-hidden border border-black/5 dark:border-white/10 flex items-center bg-secondary h-52 w-52 shadow-md hover:scale-[1.01] transition-transform duration-200"
+              className="relative aspect-square rounded-xl mt-1.5 overflow-hidden border border-black/5 dark:border-white/10 flex items-center bg-secondary h-44 w-44 shadow-md hover:scale-[1.01] transition-transform duration-200"
             >
               <Image
                 src={fileUrl}
@@ -171,7 +169,7 @@ export function ChatItem({
             </a>
           )}
           {isPDF && (
-            <div className="relative flex items-center p-3 mt-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/10 w-fit">
+            <div className="relative flex items-center p-2 mt-1.5 rounded-lg bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/10 w-fit">
               <FileIcon className="h-8 w-8 fill-indigo-200 stroke-indigo-500" />
               <a
                 href={fileUrl}
@@ -186,9 +184,9 @@ export function ChatItem({
           {!fileUrl && !isEditing && (
             <p
               className={cn(
-                "text-sm text-zinc-700 dark:text-zinc-300 font-normal leading-relaxed mt-0.5",
+                "text-sm text-zinc-700 dark:text-zinc-300 font-normal leading-snug mt-0.5",
                 deleted &&
-                  "italic text-zinc-400 dark:text-zinc-500 text-xs mt-1"
+                  "italic text-zinc-400 dark:text-zinc-500 text-xs mt-0.5"
               )}
             >
               {content}
@@ -237,10 +235,16 @@ export function ChatItem({
               </span>
             </Form>
           )}
+          <div className="mt-1 flex items-center gap-x-2">
+            <div className="h-px flex-1 bg-zinc-300/70 dark:bg-white/10" />
+            <span className="shrink-0 text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
+              {timestamp}
+            </span>
+          </div>
         </div>
       </div>
       {canDeleteMessage && (
-        <div className="hidden group-hover:flex items-center gap-x-1 absolute p-1 -top-3 right-4 bg-white/95 dark:bg-[#18191c]/95 border border-black/10 dark:border-white/10 rounded-lg shadow-lg backdrop-blur-md">
+        <div className="hidden group-hover:flex items-center gap-x-1 absolute p-1 top-0 right-7 bg-white/80 dark:bg-[#18191c]/80 border border-black/10 dark:border-white/10 rounded-lg shadow-lg backdrop-blur-md">
           {canEditMessage && (
             <ActionTooltip label="Edit">
               <button
