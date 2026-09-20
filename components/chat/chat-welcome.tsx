@@ -8,7 +8,7 @@ interface ChatWelcomeProps {
 
 export function ChatWelcome({ name, type }: ChatWelcomeProps) {
   return (
-    <div className="mx-3 mb-3 mt-1 rounded-2xl border border-white/60 bg-white/45 px-4 py-3 shadow-sm shadow-black/5 backdrop-blur-md dark:border-white/10 dark:bg-white/[0.045]">
+    <div className="mx-3 mb-3 mt-1 rounded-2xl border border-black/5 bg-zinc-50/80 px-4 py-3 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-white/[0.045]">
       {type === "channel" && (
         <div className="mb-2 h-11 w-11 rounded-xl bg-indigo-500 flex items-center justify-center shadow-md shadow-indigo-500/20">
           <Hash className="h-6 w-6 text-white" />

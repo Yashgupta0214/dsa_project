@@ -20,7 +20,7 @@ export function ChatHeader({
   imageUrl
 }: ChatHeaderProps) {
   return (
-    <div className="text-md font-semibold mx-3 mt-3 mb-2 px-3.5 flex items-center h-12 rounded-xl border border-white/70 dark:border-white/10 bg-white/80 dark:bg-[#1b1d25]/75 backdrop-blur-xl sticky top-3 z-20 shadow-lg shadow-black/5 dark:shadow-black/25 transition-colors">
+    <div className="text-md font-semibold mx-3 mt-3 mb-2 px-3.5 flex items-center h-12 rounded-xl border border-black/5 dark:border-white/10 bg-white/90 dark:bg-[#1b1d25]/75 backdrop-blur-xl sticky top-3 z-20 shadow-sm dark:shadow-black/25 transition-colors">
       <MobileToggle serverId={serverId} />
       {type === "channel" && (
         <div className="p-1.5 rounded-lg bg-indigo-500 text-white mr-2 shadow-sm shadow-indigo-500/30">

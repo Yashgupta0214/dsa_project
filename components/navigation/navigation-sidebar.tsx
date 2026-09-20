@@ -27,7 +27,7 @@ export async function NavigationSidebar() {
   });
 
   return (
-    <div className="space-y-3 flex flex-col h-full items-center text-primary w-full bg-[linear-gradient(180deg,#eef2ff_0%,#e2e8f0_100%)] dark:bg-[linear-gradient(180deg,#10121a_0%,#0b0c11_100%)] py-2.5 border-r border-black/5 dark:border-white/10 shadow-inner">
+    <div className="space-y-3 flex flex-col h-full items-center text-primary w-full bg-[#e3e5e8] dark:bg-[linear-gradient(180deg,#11131a_0%,#0b0c11_100%)] py-2.5 border-r border-black/5 dark:border-white/10 shadow-inner">
       <NavigationAction />
       <Separator className="h-px bg-zinc-300 dark:bg-white/10 rounded-full w-8 mx-auto" />
       <ScrollArea className="flex-1 w-full">
