@@ -29,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useModal } from "@/hooks/use-modal-store";
+import { getMemberColor } from "@/lib/member-colors";
 
 interface ChatItemProps {
   id: string;
@@ -125,6 +126,7 @@ export function ChatItem({
   const canEditMessage = !deleted && isOwner && !fileUrl;
   const isPDF = fileType === "pdf" && fileUrl;
   const isImage = !isPDF && fileUrl;
+  const memberColor = getMemberColor(member.id);
 
   return (
     <div className="relative group w-full px-3">
@@ -144,7 +146,8 @@ export function ChatItem({
             <div className="flex items-center">
               <p
                 onClick={onMemberClick}
-                className="font-bold text-[13px] hover:underline cursor-pointer tracking-tight text-zinc-900 dark:text-zinc-100"
+                className="font-bold text-[13px] hover:underline cursor-pointer tracking-tight"
+                style={{ color: memberColor }}
               >
                 {member.profile.name}
               </p>

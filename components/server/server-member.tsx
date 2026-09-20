@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/user-avatar";
+import { getMemberColor } from "@/lib/member-colors";
 
 interface ServerMemberProps {
   member: Member & { profile: Profile };
@@ -28,6 +29,7 @@ export const ServerMember = ({ member, server }: ServerMemberProps) => {
 
   const icon = roleIconMap[member.role];
   const isActive = params?.memberId === member.id;
+  const memberColor = getMemberColor(member.id);
 
   const onClick = () =>
     router.push(`/servers/${params?.serverId}/conversations/${member.id}`);
@@ -53,9 +55,9 @@ export const ServerMember = ({ member, server }: ServerMemberProps) => {
       <p
         className={cn(
           "line-clamp-1 text-[13px] tracking-tight transition-colors",
-          !isActive && "group-hover:text-zinc-700 dark:group-hover:text-zinc-200",
-          isActive && "text-indigo-600 dark:text-indigo-300 font-medium"
+          isActive && "font-medium"
         )}
+        style={{ color: memberColor }}
       >
         {member.profile.name}
       </p>
