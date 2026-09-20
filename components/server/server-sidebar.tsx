@@ -1,10 +1,6 @@
 import React from "react";
-import { redirect } from "next/navigation";
 import { ChannelType, MemberRole } from "@prisma/client";
 import { Hash, Mic, ShieldAlert, ShieldCheck, Video } from "lucide-react";
-
-import { currentProfile } from "@/lib/current-profile";
-import { db } from "@/lib/db";
 
 import { ServerHeader } from "@/components/server/server-header";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -14,6 +10,7 @@ import { ServerSection } from "@/components/server/server-section";
 import { ServerChannel } from "@/components/server/server-channel";
 import { ServerMember } from "@/components/server/server-member";
 import { UserFooter } from "@/components/user-footer";
+import { ServerWithChannelsWithMembersWithProfiles } from "@/types";
 
 const iconMap = {
   [ChannelType.TEXT]: <Hash className="mr-2 h-4 w-4 text-indigo-500 dark:text-indigo-400" />,
@@ -29,32 +26,12 @@ const roleIconMap = {
   [MemberRole.ADMIN]: <ShieldAlert className="h-4 w-4 mr-2 text-rose-500" />
 };
 
-export async function ServerSidebar({ serverId }: { serverId: string }) {
-  const profile = await currentProfile();
+interface ServerSidebarProps {
+  server: ServerWithChannelsWithMembersWithProfiles;
+  profileId: string;
+}
 
-  if (!profile) return redirect("/");
-
-  const server = await db.server.findUnique({
-    where: {
-      id: serverId
-    },
-    include: {
-      channels: {
-        orderBy: {
-          createdAt: "asc"
-        }
-      },
-      members: {
-        include: {
-          profile: true
-        },
-        orderBy: {
-          role: "asc"
-        }
-      }
-    }
-  });
-
+export function ServerSidebar({ server, profileId }: ServerSidebarProps) {
   const textChannels = server?.channels.filter(
     (channel) => channel.type === ChannelType.TEXT
   );
@@ -66,14 +43,16 @@ export async function ServerSidebar({ serverId }: { serverId: string }) {
   );
 
   const members = server?.members.filter(
-    (member) => member.profileId !== profile.id
+    (member) => member.profileId !== profileId
   );
 
-  if (!server) return redirect("/");
-
   const role = server.members.find(
-    (member) => member.profileId === profile.id
+    (member) => member.profileId === profileId
   )?.role;
+
+  const profile = server.members.find(
+    (member) => member.profileId === profileId
+  )?.profile;
 
   return (
     <div className="relative flex flex-col h-full text-primary w-full overflow-hidden bg-[#f2f3f5] dark:bg-[linear-gradient(180deg,#1c1d25_0%,#111217_100%)] border-r border-black/5 dark:border-white/10 shadow-xl shadow-black/5 dark:shadow-black/25">
@@ -200,7 +179,7 @@ export async function ServerSidebar({ serverId }: { serverId: string }) {
             </div>
           )}
         </ScrollArea>
-        <UserFooter profile={profile} />
+        {profile && <UserFooter profile={profile} />}
       </div>
     </div>
   );

@@ -1,8 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useTransition } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { ActionTooltip } from "@/components/action-tooltip";
@@ -11,16 +12,29 @@ interface NavigationItemProps {
   id: string;
   imageUrl: string;
   name: string;
+  channelId?: string;
 }
 
-export function NavigationItem({ id, imageUrl, name }: NavigationItemProps) {
+export function NavigationItem({
+  id,
+  imageUrl,
+  name,
+  channelId
+}: NavigationItemProps) {
   const params = useParams();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   const isActive = params?.serverId === id;
 
   const onClick = () => {
-    router.push(`/servers/${id}`);
+    const href = channelId
+      ? `/servers/${id}/channels/${channelId}`
+      : `/servers/${id}`;
+
+    startTransition(() => {
+      router.push(href);
+    });
   };
 
   return (
@@ -50,8 +64,14 @@ export function NavigationItem({ id, imageUrl, name }: NavigationItemProps) {
             fill
             src={imageUrl}
             alt={name}
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            className={cn(
+              "object-cover transition-transform duration-300 group-hover:scale-105",
+              isPending && "opacity-40"
+            )}
           />
+          {isPending && (
+            <Loader2 className="absolute h-5 w-5 animate-spin text-white drop-shadow" />
+          )}
         </div>
       </button>
     </ActionTooltip>

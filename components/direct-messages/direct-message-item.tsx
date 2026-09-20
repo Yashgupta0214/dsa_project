@@ -20,7 +20,7 @@ export function DirectMessageItem({ member }: DirectMessageItemProps) {
 
   const isActive = params?.memberId === member.id;
   const memberColor = getMemberColor(member.id);
-  const href = `/servers/${member.serverId}/conversations/${member.id}`;
+  const href = `/direct-messages/${member.id}`;
 
   return (
     <Link

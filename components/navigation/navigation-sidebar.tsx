@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { NavigationAction } from "@/components/navigation/navigation-action";
 import { NavigationJoinAction } from "@/components/navigation/navigation-join-action";
 import { NavigationSearchAction } from "@/components/navigation/navigation-search-action";
+import { NavigationDms } from "@/components/navigation/navigation-dms";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { NavigationItem } from "@/components/navigation/navigation-item";
@@ -25,6 +26,17 @@ export async function NavigationSidebar() {
           profileId: profile.id
         }
       }
+    },
+    include: {
+      channels: {
+        where: {
+          name: "general"
+        },
+        select: {
+          id: true
+        },
+        take: 1
+      }
     }
   });
 
@@ -33,6 +45,7 @@ export async function NavigationSidebar() {
       <NavigationAction />
       <NavigationJoinAction />
       <NavigationSearchAction servers={servers} />
+      <NavigationDms />
       <Separator className="h-px bg-zinc-300 dark:bg-white/10 rounded-full w-8 mx-auto" />
       <ScrollArea className="flex-1 w-full">
         {servers.map((server) => (
@@ -41,6 +54,7 @@ export async function NavigationSidebar() {
               id={server.id}
               imageUrl={server.imageUrl}
               name={server.name}
+              channelId={server.channels[0]?.id}
             />
           </div>
         ))}
