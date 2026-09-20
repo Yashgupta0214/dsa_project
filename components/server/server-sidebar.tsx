@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { ServerSection } from "@/components/server/server-section";
 import { ServerChannel } from "@/components/server/server-channel";
 import { ServerMember } from "@/components/server/server-member";
+import { UserFooter } from "@/components/user-footer";
 
 const iconMap = {
   [ChannelType.TEXT]: <Hash className="mr-2 h-4 w-4 text-indigo-500 dark:text-indigo-400" />,
@@ -199,6 +200,7 @@ export async function ServerSidebar({ serverId }: { serverId: string }) {
             </div>
           )}
         </ScrollArea>
+        <UserFooter profile={profile} />
       </div>
     </div>
   );

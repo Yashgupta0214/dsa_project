@@ -6,6 +6,8 @@ import { currentProfile } from "@/lib/current-profile";
 import { db } from "@/lib/db";
 
 import { NavigationAction } from "@/components/navigation/navigation-action";
+import { NavigationJoinAction } from "@/components/navigation/navigation-join-action";
+import { NavigationSearchAction } from "@/components/navigation/navigation-search-action";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { NavigationItem } from "@/components/navigation/navigation-item";
@@ -27,8 +29,10 @@ export async function NavigationSidebar() {
   });
 
   return (
-    <div className="space-y-3 flex flex-col h-full items-center text-primary w-full bg-[#e3e5e8] dark:bg-[linear-gradient(180deg,#11131a_0%,#0b0c11_100%)] py-2.5 border-r border-black/5 dark:border-white/10 shadow-inner">
+    <div className="space-y-2.5 flex flex-col h-full items-center text-primary w-full bg-[#e3e5e8] dark:bg-[linear-gradient(180deg,#11131a_0%,#0b0c11_100%)] py-2.5 border-r border-black/5 dark:border-white/10 shadow-inner">
       <NavigationAction />
+      <NavigationJoinAction />
+      <NavigationSearchAction servers={servers} />
       <Separator className="h-px bg-zinc-300 dark:bg-white/10 rounded-full w-8 mx-auto" />
       <ScrollArea className="flex-1 w-full">
         {servers.map((server) => (

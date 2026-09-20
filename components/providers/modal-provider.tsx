@@ -13,6 +13,9 @@ import { DeleteChannelModal } from "@/components/modals/delete-channel-modal";
 import { EditChannelModal } from "@/components/modals/edit-channel-modal";
 import { MessageFileModal } from "@/components/modals/message-file-modal";
 import { DeleteMessageModal } from "@/components/modals/delete-message-modal";
+import { JoinServerModal } from "@/components/modals/join-server-modal";
+import { SearchServersModal } from "@/components/modals/search-servers-modal";
+import { EditProfileModal } from "@/components/modals/edit-profile-modal";
 
 export function ModalProvider() {
   const [isMounted, setIsMounted] = useState(false);
@@ -36,6 +39,9 @@ export function ModalProvider() {
       <EditChannelModal />
       <MessageFileModal />
       <DeleteMessageModal />
+      <JoinServerModal />
+      <SearchServersModal />
+      <EditProfileModal />
     </>
   );
 }

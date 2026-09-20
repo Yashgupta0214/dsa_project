@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { DirectMessageItem } from "@/components/direct-messages/direct-message-item";
+import { UserFooter } from "@/components/user-footer";
 
 export async function DirectMessagesSidebar() {
   const profile = await currentProfile();
@@ -75,6 +76,7 @@ export async function DirectMessagesSidebar() {
           ))}
         </div>
       </ScrollArea>
+      <UserFooter profile={profile} />
     </aside>
   );
 }
