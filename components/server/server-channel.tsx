@@ -46,9 +46,9 @@ export function ServerChannel({
       className={cn(
         "group relative px-2.5 py-1.5 rounded-md flex items-center gap-x-2 w-full transition-all duration-150 focus:outline-none",
         !isActive &&
-          "hover:bg-zinc-200/60 dark:hover:bg-white/[0.04] text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200",
+          "hover:bg-zinc-200/60 dark:hover:bg-white/[0.06] text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100",
         isActive &&
-          "bg-indigo-500/10 dark:bg-indigo-500/12 text-indigo-600 dark:text-indigo-300 font-semibold"
+          "bg-zinc-200/80 dark:bg-indigo-500/20 text-zinc-900 dark:text-indigo-300 font-semibold shadow-sm"
       )}
       onClick={onClick}
     >
@@ -58,17 +58,17 @@ export function ServerChannel({
       <Icon
         className={cn(
           "flex-shrink-0 w-3.5 h-3.5 transition-colors",
-          !isActive && "text-zinc-400 group-hover:text-zinc-500 dark:text-zinc-500 dark:group-hover:text-zinc-300",
-          isActive && channel.type === ChannelType.TEXT && "text-indigo-500 dark:text-indigo-400",
-          isActive && channel.type === ChannelType.AUDIO && "text-emerald-500 dark:text-emerald-400",
-          isActive && channel.type === ChannelType.VIDEO && "text-amber-500 dark:text-amber-400"
+          !isActive && "text-zinc-500 group-hover:text-zinc-700 dark:text-zinc-400 dark:group-hover:text-zinc-200",
+          isActive && channel.type === ChannelType.TEXT && "text-indigo-600 dark:text-indigo-400",
+          isActive && channel.type === ChannelType.AUDIO && "text-emerald-600 dark:text-emerald-400",
+          isActive && channel.type === ChannelType.VIDEO && "text-amber-600 dark:text-amber-400"
         )}
       />
       <p
         className={cn(
           "line-clamp-1 text-[13px] tracking-tight transition-colors",
-          !isActive && "group-hover:text-zinc-700 dark:group-hover:text-zinc-200",
-          isActive && "text-indigo-600 dark:text-indigo-300 font-medium"
+          !isActive && "group-hover:text-zinc-900 dark:group-hover:text-zinc-100",
+          isActive && "text-indigo-700 dark:text-indigo-300 font-medium"
         )}
       >
         {channel.name}
@@ -78,13 +78,13 @@ export function ServerChannel({
           <ActionTooltip label="Edit">
             <Edit
               onClick={(e) => onAction(e, "editChannel")}
-              className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-200 transition"
+              className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition"
             />
           </ActionTooltip>
           <ActionTooltip label="Delete">
             <Trash
               onClick={(e) => onAction(e, "deleteChannel")}
-              className="w-3.5 h-3.5 text-zinc-400 hover:text-rose-500 dark:text-zinc-500 dark:hover:text-rose-400 transition"
+              className="w-3.5 h-3.5 text-zinc-400 hover:text-rose-500 dark:hover:text-rose-400 transition"
             />
           </ActionTooltip>
         </div>

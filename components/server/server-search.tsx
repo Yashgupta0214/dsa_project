@@ -65,13 +65,13 @@ export function ServerSearch({ data }: ServerSearchProps) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="group px-3 py-2 rounded-xl items-center flex gap-x-2.5 w-full bg-white/75 dark:bg-white/[0.055] border border-black/5 dark:border-white/10 hover:border-indigo-500/45 dark:hover:border-indigo-500/45 transition duration-200 shadow-sm shadow-black/5 focus:outline-none"
+        className="group px-3 py-2 rounded-xl items-center flex gap-x-2.5 w-full bg-white dark:bg-white/[0.06] border border-black/5 dark:border-white/10 hover:border-black/10 dark:hover:border-white/20 hover:bg-white dark:hover:bg-white/[0.09] transition duration-200 shadow-sm focus:outline-none"
       >
-        <Search className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 group-hover:text-indigo-500 transition-colors" />
-        <p className="font-medium text-xs text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-800 dark:group-hover:text-zinc-200 transition">
+        <Search className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-200 transition-colors" />
+        <p className="font-medium text-xs text-zinc-500 dark:text-zinc-300 group-hover:text-zinc-800 dark:group-hover:text-white transition">
           Quick search...
         </p>
-        <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-0.5 rounded border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/10 px-1.5 font-mono text-[10px] font-medium text-zinc-500 dark:text-zinc-400 ml-auto">
+        <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-0.5 rounded border border-black/10 dark:border-white/10 bg-zinc-100 dark:bg-white/10 px-1.5 font-mono text-[10px] font-medium text-zinc-500 dark:text-zinc-300 ml-auto">
           <span>⌘</span>
           <span>K</span>
         </kbd>

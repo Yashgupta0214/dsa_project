@@ -40,9 +40,9 @@ export const ServerMember = ({ member, server }: ServerMemberProps) => {
       className={cn(
         "group relative px-2.5 py-1.5 rounded-md flex items-center gap-x-2 w-full transition-all duration-150 focus:outline-none",
         !isActive &&
-          "hover:bg-zinc-200/60 dark:hover:bg-white/[0.04] text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200",
+          "hover:bg-zinc-200/60 dark:hover:bg-white/[0.06] text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100",
         isActive &&
-          "bg-indigo-500/10 dark:bg-indigo-500/12 text-indigo-600 dark:text-indigo-300 font-semibold"
+          "bg-zinc-200/80 dark:bg-indigo-500/20 text-zinc-900 dark:text-indigo-300 font-semibold shadow-sm"
       )}
     >
       {isActive && (
@@ -50,12 +50,14 @@ export const ServerMember = ({ member, server }: ServerMemberProps) => {
       )}
       <UserAvatar
         src={member.profile.imageUrl}
-        className="h-6 w-6 md:h-6 md:w-6 ring-1 ring-black/5 dark:ring-white/10"
+        className="h-6 w-6 md:h-6 md:w-6 ring-1 ring-black/10 dark:ring-white/10"
       />
       <p
         className={cn(
           "line-clamp-1 text-[13px] tracking-tight transition-colors",
-          isActive && "font-medium"
+          !isActive &&
+            "group-hover:text-zinc-900 text-zinc-600 dark:group-hover:text-zinc-100 dark:text-zinc-300",
+          isActive && "text-indigo-700 dark:text-indigo-300 font-medium"
         )}
         style={{ color: memberColor }}
       >
