@@ -15,7 +15,8 @@ export type ModalType =
   | "deleteMessage"
   | "joinServer"
   | "searchServers"
-  | "editProfile";
+  | "editProfile"
+  | "userSettings";
 
 interface ModalData {
   server?: Server;

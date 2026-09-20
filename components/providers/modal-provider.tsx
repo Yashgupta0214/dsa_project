@@ -16,6 +16,7 @@ import { DeleteMessageModal } from "@/components/modals/delete-message-modal";
 import { JoinServerModal } from "@/components/modals/join-server-modal";
 import { SearchServersModal } from "@/components/modals/search-servers-modal";
 import { EditProfileModal } from "@/components/modals/edit-profile-modal";
+import { UserSettingsModal } from "@/components/modals/user-settings-modal";
 
 export function ModalProvider() {
   const [isMounted, setIsMounted] = useState(false);
@@ -42,6 +43,7 @@ export function ModalProvider() {
       <JoinServerModal />
       <SearchServersModal />
       <EditProfileModal />
+      <UserSettingsModal />
     </>
   );
 }
