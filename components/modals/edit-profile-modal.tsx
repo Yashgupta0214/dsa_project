@@ -70,12 +70,11 @@ export function EditProfileModal() {
       localStorage.setItem("user_presence_status", status);
       window.dispatchEvent(new Event("user_status_changed"));
 
-      router.refresh();
       handleClose();
+      router.refresh();
     } catch (err: any) {
       console.error(err);
       setError(err?.response?.data || "Failed to update profile.");
-    } finally {
       setIsLoading(false);
     }
   };

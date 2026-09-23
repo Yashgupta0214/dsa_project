@@ -52,6 +52,7 @@ model Member {
 
   @@index([profileId])
   @@index([serverId])
+  @@index([serverId, profileId])
 }
 
 model Channel {
@@ -84,6 +85,7 @@ model Message {
 
   @@index([channelId])
   @@index([memberId])
+  @@index([channelId, createdAt])
 }
 
 model Conversation {
@@ -95,6 +97,7 @@ model Conversation {
   directMessages DirectMessage[]
 
   @@unique([memberOneId, memberTwoId])
+  @@index([memberOneId])
   @@index([memberTwoId])
 }
 
@@ -112,6 +115,7 @@ model DirectMessage {
 
   @@index([memberId])
   @@index([conversationId])
+  @@index([conversationId, createdAt])
 }
 
 enum MemberRole {

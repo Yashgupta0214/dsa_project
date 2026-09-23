@@ -9,9 +9,9 @@ const nextConfig = {
     return config;
   },
   images: {
-    domains: ["uploadthing.com", "img.clerk.com"]
+    domains: ["uploadthing.com", "utfs.io", "img.clerk.com"]
   },
-  swcMinify: false
+  swcMinify: true
 };
 
 module.exports = nextConfig;

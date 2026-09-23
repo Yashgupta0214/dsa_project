@@ -47,13 +47,33 @@ export function CreateServerModal() {
     }
   });
 
+  const [isTemporary, setIsTemporary] = React.useState(false);
+  const [expiryDays, setExpiryDays] = React.useState(7);
+  const [customTimestamp, setCustomTimestamp] = React.useState<number | null>(null);
+
   const isLoading = form.formState.isSubmitting;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      await axios.post("/api/servers", values);
+      const response = await axios.post("/api/servers", values);
+      const newServer = response.data;
+
+      if (newServer && newServer.id && isTemporary) {
+        const finalExpiry = customTimestamp || Date.now() + expiryDays * 24 * 60 * 60 * 1000;
+        const extendedSettings = {
+          isTemporary: true,
+          expiryTimestamp: finalExpiry,
+          expiryAction: "archive"
+        };
+        localStorage.setItem(
+          `server_settings_${newServer.id}`,
+          JSON.stringify(extendedSettings)
+        );
+      }
 
       form.reset();
+      setIsTemporary(false);
+      setCustomTimestamp(null);
       router.refresh();
       onClose();
     } catch (error) {
@@ -118,6 +138,81 @@ export function CreateServerModal() {
                   </FormItem>
                 )}
               />
+
+              {/* Temporary Server Mode Toggle */}
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                      Set as Temporary Server
+                    </p>
+                    <p className="text-[11px] text-zinc-500">
+                      Auto-expires after a set period (study group, hackathon, event)
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsTemporary(!isTemporary)}
+                    className={`w-10 h-5.5 rounded-full p-0.5 transition-colors ${
+                      isTemporary ? "bg-amber-500" : "bg-zinc-300 dark:bg-zinc-700"
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                        isTemporary ? "translate-x-4.5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {isTemporary && (
+                  <div className="space-y-2 pt-1">
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[
+                        { label: "1 Day", days: 1 },
+                        { label: "7 Days", days: 7 },
+                        { label: "14 Days", days: 14 },
+                        { label: "30 Days", days: 30 }
+                      ].map((p) => (
+                        <button
+                          key={p.days}
+                          type="button"
+                          onClick={() => setExpiryDays(p.days)}
+                          className={`p-1.5 rounded-lg border text-xs font-semibold transition ${
+                            expiryDays === p.days
+                              ? "border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                              : "border-black/5 dark:border-white/10 hover:bg-black/5 text-zinc-600 dark:text-zinc-400"
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="pt-1">
+                      <span className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 block mb-1">
+                        Or Select Exact Custom Expiry Date & Time:
+                      </span>
+                      <input
+                        type="datetime-local"
+                        value={
+                          customTimestamp
+                            ? new Date(customTimestamp - new Date().getTimezoneOffset() * 60000)
+                                .toISOString()
+                                .slice(0, 16)
+                            : ""
+                        }
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            setCustomTimestamp(new Date(e.target.value).getTime());
+                          }
+                        }}
+                        className="w-full bg-white dark:bg-white/[0.06] border border-black/10 dark:border-white/10 text-zinc-900 dark:text-white rounded-lg p-2 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             <DialogFooter className="bg-zinc-50 dark:bg-[#18191c] px-6 py-4 border-t border-black/5 dark:border-white/5">
               <Button

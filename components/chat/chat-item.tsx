@@ -7,7 +7,10 @@ import {
   FileIcon,
   ShieldAlert,
   ShieldCheck,
-  Trash
+  Trash,
+  Copy,
+  Check,
+  Reply
 } from "lucide-react";
 import Image from "next/image";
 import * as z from "zod";
@@ -128,6 +131,45 @@ export function ChatItem({
   const isImage = !isPDF && fileUrl;
   const memberColor = getMemberColor(member.id);
 
+  const [copied, setCopied] = useState(false);
+  const [reactions, setReactions] = useState<Record<string, number>>({});
+  const [userReactions, setUserReactions] = useState<Record<string, boolean>>({});
+
+  const onCopy = () => {
+    if (!content) return;
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const onQuoteReply = () => {
+    window.dispatchEvent(
+      new CustomEvent("chat_reply_quote", {
+        detail: {
+          author: member.profile.name,
+          content: content
+        }
+      })
+    );
+  };
+
+  const toggleReaction = (emoji: string) => {
+    setReactions((prev) => {
+      const current = prev[emoji] || 0;
+      const isReacted = userReactions[emoji];
+      const updated = isReacted ? Math.max(0, current - 1) : current + 1;
+      const nextReactions = { ...prev };
+      if (updated > 0) nextReactions[emoji] = updated;
+      else delete nextReactions[emoji];
+      return nextReactions;
+    });
+
+    setUserReactions((prev) => ({
+      ...prev,
+      [emoji]: !prev[emoji]
+    }));
+  };
+
   return (
     <div className="relative group w-full px-3">
       <div className="absolute left-5 top-0 bottom-0 w-px bg-indigo-300/70 dark:bg-indigo-300/25" />
@@ -238,6 +280,28 @@ export function ChatItem({
               </span>
             </Form>
           )}
+
+          {/* Reaction Badges */}
+          {Object.keys(reactions).length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 mt-1.5">
+              {Object.entries(reactions).map(([emoji, count]) => (
+                <button
+                  key={emoji}
+                  onClick={() => toggleReaction(emoji)}
+                  className={cn(
+                    "flex items-center gap-x-1 px-2 py-0.5 rounded-lg border text-xs transition",
+                    userReactions[emoji]
+                      ? "border-indigo-500 bg-indigo-500/10 text-indigo-500 font-semibold"
+                      : "border-black/5 dark:border-white/10 bg-black/5 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-black/10 dark:hover:bg-white/10"
+                  )}
+                >
+                  <span>{emoji}</span>
+                  <span className="text-[11px] font-bold">{count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="mt-1 flex items-center gap-x-2">
             <div className="h-px flex-1 bg-zinc-300/70 dark:bg-white/10" />
             <span className="shrink-0 text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
@@ -246,18 +310,61 @@ export function ChatItem({
           </div>
         </div>
       </div>
-      {canDeleteMessage && (
-        <div className="hidden group-hover:flex items-center gap-x-1 absolute p-1 top-0 right-7 bg-white/80 dark:bg-[#18191c]/80 border border-black/10 dark:border-white/10 rounded-lg shadow-lg backdrop-blur-md">
-          {canEditMessage && (
-            <ActionTooltip label="Edit">
-              <button
-                onClick={() => setIsEditing(true)}
-                className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition"
-              >
-                <Edit className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200" />
-              </button>
-            </ActionTooltip>
-          )}
+
+      {/* Hover Actions Menu */}
+      <div className="hidden group-hover:flex items-center gap-x-0.5 absolute p-1 top-0 right-7 bg-white/90 dark:bg-[#18191c]/90 border border-black/10 dark:border-white/10 rounded-xl shadow-xl backdrop-blur-md z-10 transition">
+        {/* Quick Reactions */}
+        {["❤️", "👍", "🔥", "😂"].map((emoji) => (
+          <button
+            key={emoji}
+            onClick={() => toggleReaction(emoji)}
+            className="p-1 text-xs hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition"
+          >
+            {emoji}
+          </button>
+        ))}
+
+        <div className="w-px h-3 bg-black/10 dark:bg-white/10 mx-0.5" />
+
+        {/* Copy Text Action */}
+        {!fileUrl && content && (
+          <ActionTooltip label={copied ? "Copied!" : "Copy Text"}>
+            <button
+              onClick={onCopy}
+              className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
+            >
+              {copied ? (
+                <Check className="w-3.5 h-3.5 text-emerald-500" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200" />
+              )}
+            </button>
+          </ActionTooltip>
+        )}
+
+        {/* Quote Reply Action */}
+        {!deleted && (
+          <ActionTooltip label="Quote Reply">
+            <button
+              onClick={onQuoteReply}
+              className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
+            >
+              <Reply className="w-3.5 h-3.5 text-zinc-400 hover:text-indigo-500" />
+            </button>
+          </ActionTooltip>
+        )}
+
+        {canEditMessage && (
+          <ActionTooltip label="Edit">
+            <button
+              onClick={() => setIsEditing(true)}
+              className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
+            >
+              <Edit className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200" />
+            </button>
+          </ActionTooltip>
+        )}
+        {canDeleteMessage && (
           <ActionTooltip label="Delete">
             <button
               onClick={() =>
@@ -266,13 +373,13 @@ export function ChatItem({
                   query: socketQuery
                 })
               }
-              className="p-1 rounded hover:bg-rose-500/10 transition"
+              className="p-1 rounded-lg hover:bg-rose-500/10 transition"
             >
               <Trash className="w-3.5 h-3.5 text-zinc-400 hover:text-rose-500" />
             </button>
           </ActionTooltip>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

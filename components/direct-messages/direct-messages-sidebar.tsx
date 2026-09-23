@@ -27,7 +27,13 @@ export async function DirectMessagesSidebar() {
         }
       }
     },
-    include: {
+    select: {
+      id: true,
+      role: true,
+      profileId: true,
+      serverId: true,
+      createdAt: true,
+      updatedAt: true,
       profile: true,
       server: true
     },

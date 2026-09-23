@@ -39,6 +39,21 @@ export function ChatInput({ apiUrl, query, name, type }: ChatInputProps) {
     defaultValues: { content: "" }
   });
 
+  React.useEffect(() => {
+    const handleQuote = (e: any) => {
+      if (e?.detail?.author && e?.detail?.content) {
+        const quote = `> Replying to @${e.detail.author}: "${e.detail.content.slice(0, 50)}${
+          e.detail.content.length > 50 ? "..." : ""
+        }"\n`;
+        const current = form.getValues("content") || "";
+        form.setValue("content", quote + current);
+      }
+    };
+
+    window.addEventListener("chat_reply_quote", handleQuote);
+    return () => window.removeEventListener("chat_reply_quote", handleQuote);
+  }, [form]);
+
   const isLoading = form.formState.isSubmitting;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -48,10 +63,10 @@ export function ChatInput({ apiUrl, query, name, type }: ChatInputProps) {
         query
       });
 
-      await axios.post(url, values);
-
+      const contentToSend = values.content;
       form.reset();
-      router.refresh();
+
+      await axios.post(url, { content: contentToSend });
     } catch (error) {
       console.error(error);
     }
@@ -80,20 +95,20 @@ export function ChatInput({ apiUrl, query, name, type }: ChatInputProps) {
                     placeholder={`Message ${
                       type === "conversation" ? "@" + name : "#" + name
                     }...`}
-                    disabled={isLoading}
+                    autoComplete="off"
                     className="h-12 px-3 bg-transparent border-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-zinc-100 placeholder:text-zinc-400 text-sm font-normal"
                     {...field}
                   />
                   <div className="mr-1.5 flex-shrink-0">
                     <EmojiPicker
                       onChange={(emoji: string) =>
-                        field.onChange(`${field.value} ${emoji}`)
+                        field.onChange(`${field.value ? field.value + " " : ""}${emoji}`)
                       }
                     />
                   </div>
                   <button
                     type="submit"
-                    disabled={isLoading || !field.value.trim()}
+                    disabled={!field.value || !field.value.trim()}
                     className="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-500 text-white shadow-md shadow-indigo-500/25 transition hover:bg-indigo-600 disabled:cursor-not-allowed disabled:bg-zinc-700/50 disabled:text-zinc-500 disabled:shadow-none"
                   >
                     <SendHorizonal className="h-3.5 w-3.5" />

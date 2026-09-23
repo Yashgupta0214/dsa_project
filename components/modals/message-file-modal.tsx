@@ -64,8 +64,8 @@ export function MessageFileModal() {
       await axios.post(url, { ...values, content: values.fileUrl });
 
       form.reset();
-      router.refresh();
       handleClose();
+      router.refresh();
     } catch (error) {
       console.error(error);
     }

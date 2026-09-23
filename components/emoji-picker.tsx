@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { Smile } from "lucide-react";
-import Picker from "@emoji-mart/react";
+import dynamic from "next/dynamic";
+import { Smile, Loader2 } from "lucide-react";
 import data from "@emoji-mart/data";
 import { useTheme } from "next-themes";
 
@@ -11,6 +11,15 @@ import {
   PopoverContent,
   PopoverTrigger
 } from "@/components/ui/popover";
+
+const Picker = dynamic(() => import("@emoji-mart/react"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[350px] w-[300px] items-center justify-center rounded-xl bg-zinc-900/90 shadow-xl backdrop-blur-md">
+      <Loader2 className="h-6 w-6 animate-spin text-indigo-400" />
+    </div>
+  )
+});
 
 interface EmojiPickerProps {
   onChange: (value: string) => void;

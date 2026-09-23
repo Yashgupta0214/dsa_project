@@ -23,19 +23,19 @@ export default async function DirectMessagePage({
   params: { memberId },
   searchParams: { video }
 }: DirectMessagePageProps) {
-  const profile = await currentProfile();
+  const [profile, otherMember] = await Promise.all([
+    currentProfile(),
+    db.member.findUnique({
+      where: {
+        id: memberId
+      },
+      include: {
+        profile: true
+      }
+    })
+  ]);
 
   if (!profile) return redirectToSignIn();
-
-  const otherMember = await db.member.findUnique({
-    where: {
-      id: memberId
-    },
-    include: {
-      profile: true
-    }
-  });
-
   if (!otherMember) return redirect("/direct-messages");
 
   const currentMember = await db.member.findFirst({
