@@ -2,21 +2,25 @@
 
 import { Member, Profile, Server } from "@prisma/client";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 import { getMemberColor } from "@/lib/member-colors";
 
 interface DirectMessageItemProps {
-  member: Member & {
-    profile: Profile;
-    server: Server;
+  member: Pick<
+    Member,
+    "id" | "profileId" | "serverId" | "role" | "createdAt" | "updatedAt"
+  > & {
+    profile: Pick<Profile, "name" | "imageUrl">;
+    server: Pick<Server, "name">;
   };
 }
 
 export function DirectMessageItem({ member }: DirectMessageItemProps) {
   const params = useParams();
+  const router = useRouter();
 
   const isActive = params?.memberId === member.id;
   const memberColor = getMemberColor(member.id);
@@ -25,6 +29,8 @@ export function DirectMessageItem({ member }: DirectMessageItemProps) {
   return (
     <Link
       href={href}
+      prefetch
+      onMouseEnter={() => router.prefetch(href)}
       className={cn(
         "group flex h-11 w-full cursor-pointer items-center gap-x-2 rounded-md px-2 text-left transition",
         "hover:bg-zinc-200/70 dark:hover:bg-white/[0.06]",

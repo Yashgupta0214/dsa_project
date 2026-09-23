@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,7 +22,14 @@ import {
   Trash2,
   Calendar,
   Hourglass,
-  Plus
+  Plus,
+  Webhook as WebhookIcon,
+  Copy,
+  CheckCheck,
+  Radio,
+  Send,
+  Wand2,
+  RefreshCw
 } from "lucide-react";
 
 import {
@@ -42,13 +49,24 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/file-upload";
 import { useModal } from "@/hooks/use-modal-store";
+import { Channel } from "@prisma/client";
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Server name is required." }),
   imageUrl: z.string().min(1, { message: "Server image is required." })
 });
 
-type ServerTab = "overview" | "moderation" | "privacy" | "temporary";
+type ServerTab = "overview" | "integrations" | "temporary" | "moderation" | "privacy";
+
+interface WebhookItem {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+  token?: string;
+  channelId: string;
+  channel?: { name: string };
+  createdAt: string;
+}
 
 export function EditServerModal() {
   const { isOpen, onClose, type, data } = useModal();
@@ -74,6 +92,16 @@ export function EditServerModal() {
   const [expiryAction, setExpiryAction] = useState<"archive" | "delete">("archive");
   const [countdownText, setCountdownText] = useState("");
 
+  // Webhooks State
+  const [webhooks, setWebhooks] = useState<WebhookItem[]>([]);
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [newWebhookName, setNewWebhookName] = useState("");
+  const [selectedChannelId, setSelectedChannelId] = useState("");
+  const [isCreatingWebhook, setIsCreatingWebhook] = useState(false);
+  const [isAutoConfiguring, setIsAutoConfiguring] = useState(false);
+  const [copiedWebhookId, setCopiedWebhookId] = useState<string | null>(null);
+  const [testSuccessId, setTestSuccessId] = useState<string | null>(null);
+
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -82,8 +110,33 @@ export function EditServerModal() {
     }
   });
 
+  const loadWebhooksAndChannels = useCallback(async () => {
+    if (!server?.id) return;
+    try {
+      const [whRes, chRes] = await Promise.all([
+        axios.get(`/api/servers/${server.id}/webhooks`),
+        axios.get(`/api/channels?serverId=${server.id}`)
+      ]);
+      const fetchedWebhooks = whRes.data || [];
+      const fetchedChannels = chRes.data || [];
+
+      setWebhooks(fetchedWebhooks);
+      setChannels(fetchedChannels);
+
+      if (fetchedChannels.length > 0) {
+        setSelectedChannelId((prev) =>
+          prev && fetchedChannels.some((c: Channel) => c.id === prev)
+            ? prev
+            : fetchedChannels[0].id
+        );
+      }
+    } catch (e) {
+      console.error("Error loading webhooks or channels:", e);
+    }
+  }, [server?.id]);
+
   useEffect(() => {
-    if (server) {
+    if (server && isModalOpen) {
       form.setValue("name", server.name);
       form.setValue("imageUrl", server.imageUrl);
 
@@ -117,10 +170,12 @@ export function EditServerModal() {
       } catch (err) {
         console.error("Error loading server settings:", err);
       }
-    }
-  }, [server, form, isModalOpen]);
 
-  // Live Countdown Timer Effect
+      loadWebhooksAndChannels();
+    }
+  }, [server, isModalOpen, form, loadWebhooksAndChannels]);
+
+  // Temporary countdown ticker
   useEffect(() => {
     if (!isTemporary || !expiryTimestamp) {
       setCountdownText("");
@@ -128,24 +183,17 @@ export function EditServerModal() {
     }
 
     const updateCountdown = () => {
-      const now = Date.now();
-      const diff = expiryTimestamp - now;
-
+      const diff = expiryTimestamp - Date.now();
       if (diff <= 0) {
-        setCountdownText(expiryAction === "archive" ? "Expired (Archived / Read-Only)" : "Expired (Scheduled for deletion)");
+        setCountdownText(expiryAction === "archive" ? "Server Locked / Archived" : "Server Expired");
         return;
       }
-
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-      if (days > 0) {
-        setCountdownText(`${days}d ${hours}h ${minutes}m remaining`);
-      } else {
-        setCountdownText(`${hours}h ${minutes}m ${seconds}s remaining`);
-      }
+      setCountdownText(`${days}d ${hours}h ${minutes}m ${seconds}s`);
     };
 
     updateCountdown();
@@ -159,10 +207,67 @@ export function EditServerModal() {
     setExpiryTimestamp(target);
   };
 
-  const extendExpiryDays = (days: number) => {
-    const currentBase = expiryTimestamp && expiryTimestamp > Date.now() ? expiryTimestamp : Date.now();
-    setExpiryTimestamp(currentBase + days * 24 * 60 * 60 * 1000);
-    setIsTemporary(true);
+  const handleCreateWebhook = async () => {
+    if (!server?.id || !newWebhookName.trim() || !selectedChannelId) return;
+    try {
+      setIsCreatingWebhook(true);
+      const res = await axios.post(`/api/servers/${server.id}/webhooks`, {
+        name: newWebhookName.trim(),
+        channelId: selectedChannelId
+      });
+      setWebhooks((prev) => [res.data, ...prev]);
+      setNewWebhookName("");
+    } catch (err) {
+      console.error("Failed to create webhook:", err);
+    } finally {
+      setIsCreatingWebhook(false);
+    }
+  };
+
+  const handleAutoConfigureAll = async () => {
+    if (!server?.id) return;
+    try {
+      setIsAutoConfiguring(true);
+      const res = await axios.post(`/api/servers/${server.id}/webhooks/auto`);
+      if (res.data?.webhooks) {
+        setWebhooks(res.data.webhooks);
+      }
+    } catch (err) {
+      console.error("Failed to auto-configure webhooks:", err);
+    } finally {
+      setIsAutoConfiguring(false);
+    }
+  };
+
+  const handleDeleteWebhook = async (webhookId: string) => {
+    if (!server?.id) return;
+    try {
+      await axios.delete(`/api/servers/${server.id}/webhooks/${webhookId}`);
+      setWebhooks((prev) => prev.filter((w) => w.id !== webhookId));
+    } catch (err) {
+      console.error("Failed to delete webhook:", err);
+    }
+  };
+
+  const handleCopyWebhookUrl = (webhookId: string) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const url = `${origin}/api/socket/webhooks/${webhookId}`;
+    navigator.clipboard.writeText(url);
+    setCopiedWebhookId(webhookId);
+    setTimeout(() => setCopiedWebhookId(null), 2500);
+  };
+
+  const handleTestWebhookPing = async (webhook: WebhookItem) => {
+    try {
+      await axios.post(`/api/socket/webhooks/${webhook.id}`, {
+        content: `🚀 Notification Alert: Webhook "${webhook.name}" tested successfully! Everyone receives this instant notification on their devices.`,
+        username: webhook.name
+      });
+      setTestSuccessId(webhook.id);
+      setTimeout(() => setTestSuccessId(null), 3000);
+    } catch (err) {
+      console.error("Failed to send webhook test:", err);
+    }
   };
 
   const isLoading = form.formState.isSubmitting;
@@ -210,7 +315,7 @@ export function EditServerModal() {
 
   return (
     <Dialog open={isModalOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl p-0 overflow-hidden bg-white dark:bg-[#1e1f22] text-zinc-900 dark:text-zinc-100 border border-black/10 dark:border-white/10 shadow-2xl rounded-2xl md:h-[600px] h-[90vh] flex flex-col md:flex-row">
+      <DialogContent className="max-w-3xl p-0 overflow-hidden bg-white dark:bg-[#1e1f22] text-zinc-900 dark:text-zinc-100 border border-black/10 dark:border-white/10 shadow-2xl rounded-2xl md:h-[620px] h-[90vh] flex flex-col md:flex-row">
         {/* Left Navigation Sidebar */}
         <div className="w-full md:w-56 bg-[#f2f3f5] dark:bg-[#111214] p-4 flex flex-col justify-between border-r border-black/5 dark:border-white/10 flex-shrink-0">
           <div className="space-y-4">
@@ -233,6 +338,19 @@ export function EditServerModal() {
               >
                 <Sliders className="h-4 w-4" />
                 Overview & Theme
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("integrations")}
+                className={`w-full flex items-center gap-x-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
+                  activeTab === "integrations"
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-zinc-900 dark:hover:text-white"
+                }`}
+              >
+                <WebhookIcon className="h-4 w-4 text-emerald-500" />
+                Webhooks & Alerts
               </button>
 
               <button
@@ -319,105 +437,213 @@ export function EditServerModal() {
                           name="name"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="uppercase text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider">
+                              <FormLabel className="uppercase text-xs font-bold text-zinc-500 dark:text-zinc-400">
                                 Server Name
                               </FormLabel>
                               <FormControl>
                                 <Input
                                   disabled={isLoading}
+                                  className="bg-zinc-100 dark:bg-[#111214] border-0 text-zinc-800 dark:text-zinc-200 focus-visible:ring-1 focus-visible:ring-indigo-500"
                                   placeholder="Enter server name"
-                                  className="bg-zinc-100 dark:bg-white/[0.06] border border-black/10 dark:border-white/10 focus-visible:ring-2 focus-visible:ring-indigo-500 text-zinc-900 dark:text-white rounded-xl py-4"
                                   {...field}
                                 />
                               </FormControl>
-                              <FormMessage className="text-xs text-rose-500" />
+                              <FormMessage />
                             </FormItem>
                           )}
                         />
                       </div>
                     </div>
+                  </div>
+                )}
 
-                    {/* Server Bio / Description */}
-                    <div className="space-y-1.5">
-                      <label className="uppercase text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider flex items-center gap-x-1.5">
-                        <MessageSquare className="h-3.5 w-3.5 text-indigo-500" />
-                        Server Community Description
-                      </label>
-                      <textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Share what this server is about (e.g. Hackathon team / Study group / Gaming event)..."
-                        rows={2}
-                        className="w-full bg-zinc-100 dark:bg-white/[0.06] border border-black/10 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-white rounded-xl p-3 text-xs resize-none"
-                      />
+                {/* TAB 2: WEBHOOKS & INTEGRATIONS */}
+                {activeTab === "integrations" && (
+                  <div className="space-y-5">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                          <WebhookIcon className="h-5 w-5 text-emerald-500" />
+                          Channel Webhooks & Real-time Alerts
+                        </h3>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          External bots, GitHub, or automated scripts can post messages to notify all users on their devices.
+                        </p>
+                      </div>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={isAutoConfiguring}
+                        onClick={handleAutoConfigureAll}
+                        className="border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 text-xs shrink-0"
+                      >
+                        <Wand2 className="w-3.5 h-3.5 mr-1 text-emerald-500" />
+                        {isAutoConfiguring ? "Configuring..." : "Auto-Configure All"}
+                      </Button>
                     </div>
 
-                    {/* Server Theme Accent Selector */}
-                    <div className="space-y-2">
-                      <label className="uppercase text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider flex items-center gap-x-1.5">
-                        <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                        Server Accent Branding
-                      </label>
-                      <div className="grid grid-cols-5 gap-2">
-                        {[
-                          { id: "indigo", label: "Indigo", bg: "bg-indigo-600" },
-                          { id: "emerald", label: "Emerald", bg: "bg-emerald-600" },
-                          { id: "rose", label: "Rose", bg: "bg-rose-600" },
-                          { id: "amber", label: "Amber", bg: "bg-amber-500" },
-                          { id: "cyan", label: "Cyan", bg: "bg-cyan-500" }
-                        ].map((t) => (
-                          <button
-                            key={t.id}
-                            type="button"
-                            onClick={() => setAccentTheme(t.id)}
-                            className={`p-2 rounded-xl border flex flex-col items-center gap-1.5 transition ${
-                              accentTheme === t.id
-                                ? "border-indigo-500 bg-indigo-500/10 font-bold"
-                                : "border-black/5 dark:border-white/5 hover:bg-black/5 dark:hover:bg-white/5"
-                            }`}
-                          >
-                            <span className={`h-4 w-4 rounded-full ${t.bg} ring-2 ring-white/20`} />
-                            <span className="text-[10px] text-zinc-700 dark:text-zinc-300">{t.label}</span>
-                          </button>
-                        ))}
+                    {/* Create New Webhook Box */}
+                    <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3">
+                      <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                        Create Custom Webhook
+                      </p>
+                      <div className="flex flex-col sm:flex-row items-center gap-2.5">
+                        <Input
+                          placeholder="Webhook Name (e.g. GitHub CI, Deploy Bot)"
+                          value={newWebhookName}
+                          onChange={(e) => setNewWebhookName(e.target.value)}
+                          className="bg-white dark:bg-[#111214] border-zinc-200 dark:border-zinc-700 text-xs flex-1"
+                        />
+
+                        <select
+                          value={selectedChannelId}
+                          onChange={(e) => setSelectedChannelId(e.target.value)}
+                          className="bg-white dark:bg-[#111214] border border-zinc-200 dark:border-zinc-700 text-xs rounded-lg px-3 py-2 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                        >
+                          {channels.map((ch) => (
+                            <option key={ch.id} value={ch.id}>
+                              #{ch.name}
+                            </option>
+                          ))}
+                        </select>
+
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={!newWebhookName.trim() || isCreatingWebhook}
+                          onClick={handleCreateWebhook}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 shrink-0"
+                        >
+                          <Plus className="w-3.5 h-3.5 mr-1" />
+                          {isCreatingWebhook ? "Creating..." : "Create Webhook"}
+                        </Button>
                       </div>
+                    </div>
+
+                    {/* Webhook List */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                          Active Server Webhooks ({webhooks.length})
+                        </p>
+                        <button
+                          type="button"
+                          onClick={loadWebhooksAndChannels}
+                          className="text-[11px] text-zinc-400 hover:text-zinc-200 flex items-center gap-1"
+                        >
+                          <RefreshCw className="w-3 h-3" /> Refresh
+                        </button>
+                      </div>
+
+                      {webhooks.length === 0 ? (
+                        <div className="p-8 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 text-xs">
+                          No webhooks configured yet. Click "Auto-Configure All" above to generate webhooks for all channels!
+                        </div>
+                      ) : (
+                        webhooks.map((wh) => (
+                          <div
+                            key={wh.id}
+                            className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 flex flex-col gap-2.5"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm text-zinc-800 dark:text-zinc-100">
+                                  {wh.name}
+                                </span>
+                                {wh.channel && (
+                                  <span className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 font-semibold">
+                                    #{wh.channel.name}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleTestWebhookPing(wh)}
+                                  className="text-xs border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 h-7"
+                                >
+                                  {testSuccessId === wh.id ? (
+                                    <>
+                                      <Check className="w-3.5 h-3.5 mr-1" /> Sent!
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Send className="w-3.5 h-3.5 mr-1" /> Test Ping
+                                    </>
+                                  )}
+                                </Button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteWebhook(wh.id)}
+                                  className="text-zinc-400 hover:text-rose-500 p-1 transition"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <input
+                                readOnly
+                                value={
+                                  typeof window !== "undefined"
+                                    ? `${window.location.origin}/api/socket/webhooks/${wh.id}`
+                                    : `/api/socket/webhooks/${wh.id}`
+                                }
+                                className="w-full text-xs font-mono bg-zinc-100 dark:bg-[#111214] text-zinc-500 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 select-all"
+                              />
+
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => handleCopyWebhookUrl(wh.id)}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-8 px-3 shrink-0"
+                              >
+                                {copiedWebhookId === wh.id ? (
+                                  <>
+                                    <CheckCheck className="w-3.5 h-3.5 mr-1" /> Copied
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3.5 h-3.5 mr-1" /> Copy URL
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 )}
 
-                {/* TAB: TEMPORARY SERVER MODE */}
+                {/* TAB 3: TEMPORARY MODE */}
                 {activeTab === "temporary" && (
                   <div className="space-y-5">
                     <div>
-                      <div className="flex items-center gap-x-2">
+                      <h3 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                         <Timer className="h-5 w-5 text-amber-500" />
-                        <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Temporary Server Mode</h3>
-                      </div>
+                        Temporary Server Mode
+                      </h3>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                        Perfect for college projects, study groups, hackathons, and tournaments. Set an auto-expiry timer.
+                        Set self-destruct or auto-archive timers for event servers.
                       </p>
                     </div>
 
-                    {/* Enable Temporary Mode Toggle */}
-                    <div className="flex items-center justify-between p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                      <div className="space-y-0.5">
-                        <p className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-x-1.5">
-                          <Hourglass className="h-3.5 w-3.5" />
-                          Enable Temporary Server Mode
-                        </p>
-                        <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
-                          Automatically expires the server after the specified duration.
-                        </p>
+                    <div className="flex items-center justify-between p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                      <div>
+                        <p className="text-xs font-bold text-amber-500">Enable Temporary Lifespan</p>
+                        <p className="text-[11px] text-zinc-500">Auto archive or delete when countdown finishes</p>
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          const next = !isTemporary;
-                          setIsTemporary(next);
-                          if (next && !expiryTimestamp) {
-                            setExpiryDays(7);
-                          }
-                        }}
+                        onClick={() => setIsTemporary(!isTemporary)}
                         className={`w-11 h-6 rounded-full p-1 transition-colors ${
                           isTemporary ? "bg-amber-500" : "bg-zinc-300 dark:bg-zinc-700"
                         }`}
@@ -431,225 +657,76 @@ export function EditServerModal() {
                     </div>
 
                     {isTemporary && (
-                      <div className="space-y-4">
-                        {/* Live Countdown Badge */}
-                        <div className="p-3.5 rounded-xl bg-zinc-100 dark:bg-white/[0.05] border border-black/10 dark:border-white/10 flex items-center justify-between">
-                          <div className="flex items-center gap-x-2.5">
-                            <Clock className="h-4 w-4 text-amber-500 animate-pulse" />
-                            <div>
-                              <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Current Expiry Countdown</p>
-                              <p className="text-xs font-mono font-semibold text-amber-600 dark:text-amber-400">
-                                {countdownText || "Calculating..."}
-                              </p>
-                            </div>
-                          </div>
-                          {expiryTimestamp && (
-                            <span className="text-[11px] text-zinc-400">
-                              Expires: {new Date(expiryTimestamp).toLocaleDateString()}
-                            </span>
-                          )}
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-3 gap-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setExpiryDays(1)}
+                            className="text-xs"
+                          >
+                            1 Day
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setExpiryDays(7)}
+                            className="text-xs"
+                          >
+                            7 Days
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setExpiryDays(30)}
+                            className="text-xs"
+                          >
+                            30 Days
+                          </Button>
                         </div>
-
-                        {/* Duration Presets & Custom Date Time Picker */}
-                        <div className="space-y-3">
-                          <label className="uppercase text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider flex items-center gap-x-1.5">
-                            <Calendar className="h-3.5 w-3.5 text-indigo-500" />
-                            Choose Expiry Preset or Custom Date & Time
-                          </label>
-                          <div className="grid grid-cols-5 gap-2">
-                            {[
-                              { label: "1 Day", days: 1 },
-                              { label: "3 Days", days: 3 },
-                              { label: "7 Days", days: 7 },
-                              { label: "14 Days", days: 14 },
-                              { label: "30 Days", days: 30 }
-                            ].map((p) => (
-                              <button
-                                key={p.days}
-                                type="button"
-                                onClick={() => setExpiryDays(p.days)}
-                                className="p-2 rounded-xl border border-black/5 dark:border-white/10 bg-zinc-50 dark:bg-white/[0.03] hover:bg-indigo-500/10 hover:border-indigo-500 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition"
-                              >
-                                {p.label}
-                              </button>
-                            ))}
-                          </div>
-
-                          <div className="space-y-1 pt-1">
-                            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-                              Custom Exact Expiry Date & Time:
-                            </span>
-                            <input
-                              type="datetime-local"
-                              value={
-                                expiryTimestamp
-                                  ? new Date(expiryTimestamp - new Date().getTimezoneOffset() * 60000)
-                                      .toISOString()
-                                      .slice(0, 16)
-                                  : ""
-                              }
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  const timestamp = new Date(e.target.value).getTime();
-                                  setExpiryTimestamp(timestamp);
-                                  setIsTemporary(true);
-                                }
-                              }}
-                              className="w-full bg-zinc-100 dark:bg-white/[0.06] border border-black/10 dark:border-white/10 text-zinc-900 dark:text-white rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Extend Duration Controls */}
-                        <div className="space-y-2">
-                          <label className="uppercase text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider flex items-center gap-x-1.5">
-                            <Plus className="h-3.5 w-3.5 text-emerald-500" />
-                            Extend Expiry Time
-                          </label>
-                          <div className="flex gap-x-2">
-                            <button
-                              type="button"
-                              onClick={() => extendExpiryDays(1)}
-                              className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition flex items-center gap-x-1"
-                            >
-                              +1 Day
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => extendExpiryDays(7)}
-                              className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition flex items-center gap-x-1"
-                            >
-                              +7 Days
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => extendExpiryDays(30)}
-                              className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold hover:bg-emerald-500/20 transition flex items-center gap-x-1"
-                            >
-                              +30 Days
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Action Upon Expiry */}
-                        <div className="space-y-2">
-                          <label className="uppercase text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider">
-                            Action Upon Expiry
-                          </label>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div
-                              onClick={() => setExpiryAction("archive")}
-                              className={`p-3 rounded-xl border flex items-center gap-x-3 cursor-pointer transition ${
-                                expiryAction === "archive"
-                                  ? "border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold"
-                                  : "border-black/5 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
-                              }`}
-                            >
-                              <Archive className="h-5 w-5 flex-shrink-0" />
-                              <div>
-                                <p className="text-xs">Archive Mode</p>
-                                <p className="text-[10px] font-normal text-zinc-500">Read-Only mode, preserves chat data</p>
-                              </div>
-                            </div>
-
-                            <div
-                              onClick={() => setExpiryAction("delete")}
-                              className={`p-3 rounded-xl border flex items-center gap-x-3 cursor-pointer transition ${
-                                expiryAction === "delete"
-                                  ? "border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold"
-                                  : "border-black/5 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
-                              }`}
-                            >
-                              <Trash2 className="h-5 w-5 flex-shrink-0 text-rose-500" />
-                              <div>
-                                <p className="text-xs">Auto-Delete</p>
-                                <p className="text-[10px] font-normal text-zinc-500">Permanently delete server upon expiry</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        {countdownText && (
+                          <p className="text-xs text-amber-400 font-mono text-center">
+                            Time Remaining: {countdownText}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* TAB: MODERATION & COOLDOWN */}
+                {/* TAB 4: MODERATION & COOLDOWN */}
                 {activeTab === "moderation" && (
                   <div className="space-y-5">
                     <div>
-                      <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Moderation & Chat Controls</h3>
+                      <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Moderation</h3>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                        Set slow mode cooldowns and welcome announcements for member engagement.
+                        Configure slow mode rate limits and content moderation filters.
                       </p>
                     </div>
 
-                    {/* Slow Mode Selector */}
                     <div className="space-y-2">
-                      <label className="uppercase text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider flex items-center gap-x-1.5">
-                        <Clock className="h-3.5 w-3.5 text-indigo-500" />
-                        Slow Mode (Message Cooldown)
-                      </label>
+                      <label className="text-xs font-bold uppercase text-zinc-500">Chat Slowmode</label>
                       <div className="grid grid-cols-4 gap-2">
-                        {[
-                          { id: "off", label: "Off" },
-                          { id: "5s", label: "5s" },
-                          { id: "15s", label: "15s" },
-                          { id: "30s", label: "30s" }
-                        ].map((sm) => (
+                        {["off", "5s", "30s", "1m"].map((m) => (
                           <button
-                            key={sm.id}
+                            key={m}
                             type="button"
-                            onClick={() => setSlowMode(sm.id)}
-                            className={`p-2.5 rounded-xl border text-xs font-semibold transition ${
-                              slowMode === sm.id
-                                ? "border-indigo-500 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-                                : "border-black/5 dark:border-white/5 hover:bg-black/5 dark:hover:bg-white/5 text-zinc-600 dark:text-zinc-400"
+                            onClick={() => setSlowMode(m)}
+                            className={`p-2.5 rounded-xl border text-xs font-semibold uppercase transition ${
+                              slowMode === m
+                                ? "border-indigo-500 bg-indigo-500/10 text-indigo-500"
+                                : "border-black/5 dark:border-white/5 hover:bg-black/5 dark:hover:bg-white/5"
                             }`}
                           >
-                            {sm.label}
+                            {m}
                           </button>
                         ))}
                       </div>
                     </div>
-
-                    {/* Auto Welcome Message */}
-                    <div className="space-y-1.5">
-                      <label className="uppercase text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider flex items-center gap-x-1.5">
-                        <Megaphone className="h-3.5 w-3.5 text-emerald-500" />
-                        Auto Member Greeting Banner
-                      </label>
-                      <Input
-                        value={welcomeMessage}
-                        onChange={(e) => setWelcomeMessage(e.target.value)}
-                        placeholder="e.g. Welcome to the squad! Introduce yourself in #general."
-                        className="bg-zinc-100 dark:bg-white/[0.06] border border-black/10 dark:border-white/10 focus-visible:ring-2 focus-visible:ring-indigo-500 text-zinc-900 dark:text-white rounded-xl py-4 text-xs"
-                      />
-                    </div>
-
-                    {/* Content Spam Filter */}
-                    <div className="flex items-center justify-between p-3.5 rounded-xl bg-zinc-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/10">
-                      <div>
-                        <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Automated Content Filter</p>
-                        <p className="text-[11px] text-zinc-500">Scan messages from all members for explicit or malicious links</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setContentFilter(!contentFilter)}
-                        className={`w-11 h-6 rounded-full p-1 transition-colors ${
-                          contentFilter ? "bg-indigo-600" : "bg-zinc-300 dark:bg-zinc-700"
-                        }`}
-                      >
-                        <div
-                          className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                            contentFilter ? "translate-x-5" : "translate-x-0"
-                          }`}
-                        />
-                      </button>
-                    </div>
                   </div>
                 )}
 
-                {/* TAB: ACCESS & SECURITY */}
+                {/* TAB 5: ACCESS & SECURITY */}
                 {activeTab === "privacy" && (
                   <div className="space-y-5">
                     <div>
@@ -659,7 +736,6 @@ export function EditServerModal() {
                       </p>
                     </div>
 
-                    {/* Public Discoverability Toggle */}
                     <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-50 dark:bg-white/[0.03] border border-black/5 dark:border-white/10">
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-x-2">
@@ -681,39 +757,6 @@ export function EditServerModal() {
                           }`}
                         />
                       </button>
-                    </div>
-
-                    {/* Member Verification Selector */}
-                    <div className="space-y-2">
-                      <label className="uppercase text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wider flex items-center gap-x-1.5">
-                        <Lock className="h-3.5 w-3.5 text-rose-500" />
-                        Member Verification Standard
-                      </label>
-                      <div className="space-y-2">
-                        {[
-                          { id: "none", title: "Unrestricted", desc: "Anyone can join and post immediately" },
-                          { id: "low", title: "Low Verification", desc: "Must have a verified account email" },
-                          { id: "medium", title: "Medium Verification", desc: "Account must be older than 5 minutes" }
-                        ].map((v) => (
-                          <div
-                            key={v.id}
-                            onClick={() => setVerificationLevel(v.id)}
-                            className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition ${
-                              verificationLevel === v.id
-                                ? "border-indigo-500 bg-indigo-500/10"
-                                : "border-black/5 dark:border-white/5 hover:bg-black/5 dark:hover:bg-white/5"
-                            }`}
-                          >
-                            <div>
-                              <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{v.title}</p>
-                              <p className="text-[11px] text-zinc-500">{v.desc}</p>
-                            </div>
-                            {verificationLevel === v.id && (
-                              <Check className="h-4 w-4 text-indigo-500" />
-                            )}
-                          </div>
-                        ))}
-                      </div>
                     </div>
                   </div>
                 )}

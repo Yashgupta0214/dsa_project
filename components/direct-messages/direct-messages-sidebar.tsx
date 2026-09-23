@@ -34,8 +34,17 @@ export async function DirectMessagesSidebar() {
       serverId: true,
       createdAt: true,
       updatedAt: true,
-      profile: true,
-      server: true
+      profile: {
+        select: {
+          name: true,
+          imageUrl: true
+        }
+      },
+      server: {
+        select: {
+          name: true
+        }
+      }
     },
     orderBy: {
       profile: {

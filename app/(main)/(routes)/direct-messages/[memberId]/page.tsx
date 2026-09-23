@@ -6,7 +6,7 @@ import { ChatHeader } from "@/components/chat/chat-header";
 import { ChatInput } from "@/components/chat/chat-input";
 import { ChatMessages } from "@/components/chat/chat-messages";
 import { MediaRoom } from "@/components/media-room";
-import { getOrCreateConversation } from "@/lib/conversation";
+import { getOrCreateConversationId } from "@/lib/conversation";
 import { currentProfile } from "@/lib/current-profile";
 import { db } from "@/lib/db";
 
@@ -29,8 +29,15 @@ export default async function DirectMessagePage({
       where: {
         id: memberId
       },
-      include: {
-        profile: true
+      select: {
+        id: true,
+        serverId: true,
+        profile: {
+          select: {
+            name: true,
+            imageUrl: true
+          }
+        }
       }
     })
   ]);
@@ -43,14 +50,19 @@ export default async function DirectMessagePage({
       serverId: otherMember.serverId,
       profileId: profile.id
     },
-    include: {
-      profile: true
+    select: {
+      id: true,
+      role: true,
+      profileId: true,
+      serverId: true,
+      createdAt: true,
+      updatedAt: true
     }
   });
 
   if (!currentMember) return redirect("/direct-messages");
 
-  const conversation = await getOrCreateConversation(
+  const conversation = await getOrCreateConversationId(
     currentMember.id,
     otherMember.id
   );

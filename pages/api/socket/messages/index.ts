@@ -1,4 +1,5 @@
 import { NextApiRequest } from "next";
+import axios from "axios";
 
 import { NextApiResponseServerIo } from "@/types";
 import { currentProfilePages } from "@/lib/current-profile-pages";
@@ -79,7 +80,24 @@ export default async function handler(
 
     const channelKey = `chat:${channelId}:messages`;
 
+    // Emit message to current channel room
     res?.socket?.server?.io?.emit(channelKey, message);
+
+    // Emit global device notification for everyone in the app
+    res?.socket?.server?.io?.emit("notification:new_message", {
+      id: message.id,
+      content: message.content,
+      fileUrl: message.fileUrl,
+      channelId: channelId as string,
+      channelName: channel.name,
+      serverId: serverId as string,
+      serverName: server.name,
+      senderId: profile.userId,
+      senderName: profile.name,
+      senderAvatar: profile.imageUrl,
+      type: "channel",
+      createdAt: message.createdAt
+    });
 
     return res.status(200).json(message);
   } catch (error) {

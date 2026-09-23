@@ -19,6 +19,7 @@ interface MediaRoomProps {
 export function MediaRoom({ chatId, video, audio }: MediaRoomProps) {
   const { user } = useUser();
   const [token, setToken] = useState("");
+  const [error, setError] = useState("");
   const [isJoined, setIsJoined] = useState(false);
   const [mediaState, setMediaState] = useState({
     audioEnabled: audio,
@@ -26,20 +27,76 @@ export function MediaRoom({ chatId, video, audio }: MediaRoomProps) {
   });
 
   useEffect(() => {
-    if (!user?.firstName) return;
+    if (!user?.id) return;
 
     (async () => {
       try {
+        setError("");
+        setToken("");
+        setIsJoined(false);
+
+        const params = new URLSearchParams({
+          room: chatId,
+          identity: user.id,
+          name:
+            user.fullName ||
+            user.username ||
+            user.primaryEmailAddress?.emailAddress ||
+            "User",
+        });
+
         const response = await fetch(
-          `/api/livekit?room=${chatId}&username=${user.firstName}`
+          `/api/livekit?${params.toString()}`
         );
         const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to create LiveKit token");
+        }
+
         setToken(data.token);
       } catch (error) {
         console.error(error);
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Could not prepare the call"
+        );
       }
     })();
-  }, [user?.firstName, chatId]);
+  }, [
+    user?.id,
+    user?.fullName,
+    user?.username,
+    user?.primaryEmailAddress?.emailAddress,
+    chatId,
+  ]);
+
+  if (error)
+    return (
+      <div className="flex flex-col flex-1 justify-center items-center px-6 text-center">
+        <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">
+          Could not join the call
+        </p>
+        <p className="mt-2 max-w-md text-xs text-zinc-500 dark:text-zinc-400">
+          {error}
+        </p>
+      </div>
+    );
+
+  const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
+
+  if (!livekitUrl)
+    return (
+      <div className="flex flex-col flex-1 justify-center items-center px-6 text-center">
+        <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">
+          LiveKit is not configured
+        </p>
+        <p className="mt-2 max-w-md text-xs text-zinc-500 dark:text-zinc-400">
+          Add NEXT_PUBLIC_LIVEKIT_URL to your environment variables.
+        </p>
+      </div>
+    );
 
   if (token === "")
     return (
@@ -61,7 +118,7 @@ export function MediaRoom({ chatId, video, audio }: MediaRoomProps) {
                 Ready to join
               </p>
               <h3 className="mt-1 text-2xl font-semibold text-white">
-                {user?.firstName ?? "User"}
+                {user?.fullName ?? user?.username ?? "User"}
               </h3>
             </div>
             <div className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
@@ -95,9 +152,6 @@ export function MediaRoom({ chatId, video, audio }: MediaRoomProps) {
     );
   }
 
-  const livekitUrl =
-    process.env.NEXT_PUBLIC_LIVEKIT_URL ?? process.env.LIVEKIT_URL;
-
   return (
     <LiveKitRoom
       video={mediaState.videoEnabled}
@@ -106,6 +160,11 @@ export function MediaRoom({ chatId, video, audio }: MediaRoomProps) {
       connect={true}
       serverUrl={livekitUrl}
       data-lk-theme="default"
+      onDisconnected={() => setIsJoined(false)}
+      onError={(error) => {
+        console.error("LiveKit room error:", error);
+        setError(error.message);
+      }}
     >
       <VideoConference />
     </LiveKitRoom>

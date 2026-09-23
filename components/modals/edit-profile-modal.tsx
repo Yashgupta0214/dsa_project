@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { Moon, ShieldCheck, User, UserCheck } from "lucide-react";
+import { Bell, Moon, Settings, ShieldCheck, User, UserCheck } from "lucide-react";
 
 import {
   Dialog,
@@ -20,7 +20,7 @@ import { useModal } from "@/hooks/use-modal-store";
 import { UserAvatar } from "@/components/user-avatar";
 
 export function EditProfileModal() {
-  const { isOpen, onClose, type, data } = useModal();
+  const { isOpen, onClose, onOpen, type, data } = useModal();
   const router = useRouter();
 
   const isModalOpen = isOpen && type === "editProfile";
@@ -48,6 +48,13 @@ export function EditProfileModal() {
     setError("");
     setIsLoading(false);
     onClose();
+  };
+
+  const openFullSettings = () => {
+    onClose();
+    setTimeout(() => {
+      onOpen("userSettings", { profile });
+    }, 100);
   };
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -90,6 +97,25 @@ export function EditProfileModal() {
             Customize your username, avatar, and active status.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Quick Link to Notifications & All Settings */}
+        <div className="mx-6 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-indigo-500" />
+            <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+              Notifications & Sound Alerts
+            </span>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={openFullSettings}
+            className="text-xs h-7 border-indigo-500/30 text-indigo-500 hover:bg-indigo-500/10"
+          >
+            Configure
+          </Button>
+        </div>
 
         <form onSubmit={onSubmit} className="space-y-5">
           <div className="space-y-4 px-6">

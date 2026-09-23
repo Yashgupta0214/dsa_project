@@ -3,15 +3,19 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   const room = req.nextUrl.searchParams.get("room");
-  const username = req.nextUrl.searchParams.get("username");
+  const identity =
+    req.nextUrl.searchParams.get("identity") ??
+    req.nextUrl.searchParams.get("username");
+  const name = req.nextUrl.searchParams.get("name") ?? identity;
+
   if (!room) {
     return NextResponse.json(
       { error: 'Missing "room" query parameter' },
       { status: 400 }
     );
-  } else if (!username) {
+  } else if (!identity) {
     return NextResponse.json(
-      { error: 'Missing "username" query parameter' },
+      { error: 'Missing "identity" query parameter' },
       { status: 400 }
     );
   }
@@ -28,13 +32,16 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const at = new AccessToken(apiKey, apiSecret, { identity: username });
+  const at = new AccessToken(apiKey, apiSecret, {
+    identity,
+    name: name ?? identity,
+  });
 
   at.addGrant({
     room,
     roomJoin: true,
     canPublish: true,
-    canSubscribe: true
+    canSubscribe: true,
   });
 
   return NextResponse.json({ token: at.toJwt() });

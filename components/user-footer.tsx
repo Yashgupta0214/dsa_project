@@ -55,16 +55,21 @@ export function UserFooter({ profile }: UserFooterProps) {
     });
   };
 
-  const openSettings = (e: React.MouseEvent) => {
+  const openProfile = (e: React.MouseEvent) => {
     e.stopPropagation();
     onOpen("editProfile", { profile });
+  };
+
+  const openSettings = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onOpen("userSettings", { profile });
   };
 
   return (
     <div className="flex items-center justify-between p-2 mt-auto bg-[#e3e5e8]/80 dark:bg-[#111214] border-t border-black/5 dark:border-white/5 transition-colors duration-200">
       {/* User Info Section */}
       <button
-        onClick={openSettings}
+        onClick={openProfile}
         className="flex items-center gap-x-2 py-1 px-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/[0.06] transition text-left group min-w-0 max-w-[130px] flex-1"
       >
         <div className="relative flex-shrink-0">
@@ -143,7 +148,7 @@ export function UserFooter({ profile }: UserFooterProps) {
           </button>
         </ActionTooltip>
 
-        <ActionTooltip label="User Settings">
+        <ActionTooltip label="User Settings (Notifications, Theme & Audio)">
           <button
             onClick={openSettings}
             className="p-1.5 rounded-md text-zinc-600 dark:text-zinc-400 hover:bg-black/5 dark:hover:bg-white/[0.08] hover:text-zinc-900 dark:hover:text-zinc-200 transition"

@@ -43,12 +43,17 @@ export default async function handler(
     });
 
     if (!conversation)
-      return res.status(404).json({ error: "Connversation not found" });
+      return res.status(404).json({ error: "Conversation not found" });
 
     const member =
       conversation.memberOne.profileId === profile.id
         ? conversation.memberOne
         : conversation.memberTwo;
+
+    const otherMember =
+      conversation.memberOne.profileId === profile.id
+        ? conversation.memberTwo
+        : conversation.memberOne;
 
     if (!member)
       return res.status(404).json({ message: "Member not found" });
@@ -71,7 +76,22 @@ export default async function handler(
 
     const channelKey = `chat:${conversationId}:messages`;
 
+    // Emit message to the DM chat room
     res?.socket?.server?.io?.emit(channelKey, message);
+
+    // Emit notification targeted to recipient
+    res?.socket?.server?.io?.emit("notification:new_message", {
+      id: message.id,
+      content: message.content,
+      fileUrl: message.fileUrl,
+      conversationId: conversationId as string,
+      recipientId: otherMember.profile.userId,
+      senderId: profile.userId,
+      senderName: profile.name,
+      senderAvatar: profile.imageUrl,
+      type: "direct_message",
+      createdAt: message.createdAt
+    });
 
     return res.status(200).json(message);
   } catch (error) {

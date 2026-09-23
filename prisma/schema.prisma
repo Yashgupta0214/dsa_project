@@ -19,6 +19,7 @@ model Profile {
   servers   Server[]
   members   Member[]
   channels  Channel[]
+  webhooks  Webhook[]
 }
 
 model Server {
@@ -32,6 +33,7 @@ model Server {
   profile    Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
   members    Member[]
   channels   Channel[]
+  webhooks   Webhook[]
 
   @@index([profileId])
 }
@@ -66,9 +68,30 @@ model Channel {
   profile   Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
   server    Server      @relation(fields: [serverId], references: [id], onDelete: Cascade)
   messages  Message[]
+  webhooks  Webhook[]
 
   @@index([profileId])
   @@index([serverId])
+}
+
+model Webhook {
+  id        String   @id @default(uuid())
+  name      String
+  avatarUrl String?  @db.Text
+  token     String   @unique @default(uuid())
+  channelId String
+  serverId  String
+  profileId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  server  Server  @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([channelId])
+  @@index([serverId])
+  @@index([profileId])
 }
 
 model Message {

@@ -13,6 +13,19 @@ export const getOrCreateConversation = async (
   return conversation;
 };
 
+export const getOrCreateConversationId = async (
+  memberOneId: string,
+  memberTwoId: string
+) => {
+  let conversation = await findConversationId(memberOneId, memberTwoId);
+
+  if (!conversation) {
+    conversation = await createNewConversationId(memberOneId, memberTwoId);
+  }
+
+  return conversation;
+};
+
 const findConversation = async (
   memberOneId: string,
   memberTwoId: string
@@ -45,6 +58,30 @@ const findConversation = async (
   }
 };
 
+const findConversationId = async (memberOneId: string, memberTwoId: string) => {
+  try {
+    return await db.conversation.findFirst({
+      where: {
+        OR: [
+          {
+            memberOneId: memberOneId,
+            memberTwoId: memberTwoId
+          },
+          {
+            memberOneId: memberTwoId,
+            memberTwoId: memberOneId
+          }
+        ]
+      },
+      select: {
+        id: true
+      }
+    });
+  } catch (error) {
+    return null;
+  }
+};
+
 const createNewConversation = async (
   memberOneId: string,
   memberTwoId: string
@@ -62,6 +99,25 @@ const createNewConversation = async (
         memberTwo: {
           include: { profile: true }
         }
+      }
+    });
+  } catch (error) {
+    return null;
+  }
+};
+
+const createNewConversationId = async (
+  memberOneId: string,
+  memberTwoId: string
+) => {
+  try {
+    return await db.conversation.create({
+      data: {
+        memberOneId,
+        memberTwoId
+      },
+      select: {
+        id: true
       }
     });
   } catch (error) {

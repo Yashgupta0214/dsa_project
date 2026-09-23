@@ -4,6 +4,32 @@ import { MemberRole } from "@prisma/client";
 import { currentProfile } from "@/lib/current-profile";
 import { db } from "@/lib/db";
 
+export async function GET(req: Request) {
+  try {
+    const profile = await currentProfile();
+    const { searchParams } = new URL(req.url);
+    const serverId = searchParams.get("serverId");
+
+    if (!profile) return new NextResponse("Unauthorized", { status: 401 });
+    if (!serverId)
+      return new NextResponse("Server ID is Missing", { status: 400 });
+
+    const channels = await db.channel.findMany({
+      where: {
+        serverId
+      },
+      orderBy: {
+        createdAt: "asc"
+      }
+    });
+
+    return NextResponse.json(channels);
+  } catch (error) {
+    console.error("[CHANNELS_GET]", error);
+    return new NextResponse("Internal Error", { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const profile = await currentProfile();
@@ -45,7 +71,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(server);
   } catch (error) {
-    console.error("[CHANNELS_POST", error);
+    console.error("[CHANNELS_POST]", error);
     return new NextResponse("Internal Error", { status: 500 });
   }
 }
