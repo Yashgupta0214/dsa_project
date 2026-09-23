@@ -271,7 +271,7 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
                         </span>
                         {replyingTo.content && (
                           <span className="text-zinc-500 truncate text-xs italic max-w-[200px] md:max-w-[400px]">
-                            "{replyingTo.content}"
+                            &quot;{replyingTo.content}&quot;
                           </span>
                         )}
                       </div>

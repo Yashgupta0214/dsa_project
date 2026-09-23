@@ -539,7 +539,7 @@ export function EditServerModal() {
 
                       {webhooks.length === 0 ? (
                         <div className="p-8 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400 text-xs">
-                          No webhooks configured yet. Click "Auto-Configure All" above to generate webhooks for all channels!
+                          No webhooks configured yet. Click &quot;Auto-Configure All&quot; above to generate webhooks for all channels!
                         </div>
                       ) : (
                         webhooks.map((wh) => (
