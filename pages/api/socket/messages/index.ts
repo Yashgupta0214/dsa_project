@@ -28,36 +28,32 @@ export default async function handler(
     if (!content)
       return res.status(400).json({ error: "Content Missing" });
 
-    const server = await db.server.findFirst({
+    const channel = await db.channel.findFirst({
       where: {
-        id: serverId as string,
-        members: {
-          some: {
-            profileId: profile.id
+        id: channelId as string,
+        serverId: serverId as string,
+        server: {
+          members: {
+            some: {
+              profileId: profile.id
+            }
           }
         }
       },
       include: {
-        members: true
-      }
-    });
-
-    if (!server)
-      return res.status(404).json({ message: "Server not found" });
-
-    const channel = await db.channel.findFirst({
-      where: {
-        id: channelId as string,
-        serverId: serverId as string
+        server: true
       }
     });
 
     if (!channel)
       return res.status(404).json({ message: "Channel not found" });
 
-    const member = server.members.find(
-      (member) => member.profileId === profile.id
-    );
+    const member = await db.member.findFirst({
+      where: {
+        profileId: profile.id,
+        serverId: serverId as string
+      }
+    });
 
     if (!member)
       return res.status(404).json({ message: "Member not found" });
@@ -91,7 +87,7 @@ export default async function handler(
       channelId: channelId as string,
       channelName: channel.name,
       serverId: serverId as string,
-      serverName: server.name,
+      serverName: channel.server.name,
       senderId: profile.userId,
       senderName: profile.name,
       senderAvatar: profile.imageUrl,
