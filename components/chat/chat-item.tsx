@@ -53,6 +53,48 @@ const roleIconMap = {
   ADMIN: <ShieldAlert className="h-3.5 w-3.5 ml-1.5 text-rose-500" />
 };
 
+export interface ReplyInfo {
+  id?: string;
+  name: string;
+  avatar?: string;
+  content: string;
+}
+
+export function parseMessageContent(rawContent: string): {
+  reply: ReplyInfo | null;
+  mainContent: string;
+} {
+  if (!rawContent) return { reply: null, mainContent: "" };
+
+  // 1. Structured JSON reply prefix: [reply:{"name":"...","avatar":"...","content":"...","id":"..."}]Message
+  const structuredMatch = rawContent.match(/^\[reply:(\{.*?\})\]\n?([\s\S]*)$/);
+  if (structuredMatch) {
+    try {
+      const replyData = JSON.parse(structuredMatch[1]);
+      return {
+        reply: replyData,
+        mainContent: structuredMatch[2]
+      };
+    } catch {
+      // Fallback if parse fails
+    }
+  }
+
+  // 2. Legacy markdown quote format: > Replying to @Name: "content..."\nMessage
+  const legacyMatch = rawContent.match(/^> Replying to @(.*?): "(.*?)"\n?([\s\S]*)$/);
+  if (legacyMatch) {
+    return {
+      reply: {
+        name: legacyMatch[1],
+        content: legacyMatch[2]
+      },
+      mainContent: legacyMatch[3]
+    };
+  }
+
+  return { reply: null, mainContent: rawContent };
+}
+
 const formSchema = z.object({
   content: z.string().min(1)
 });
@@ -75,6 +117,8 @@ export function ChatItem({
   const params = useParams();
   const router = useRouter();
 
+  const { reply, mainContent } = parseMessageContent(content);
+
   const onMemberClick = () => {
     if (member.id === currentMember.id) return;
     router.push(`/servers/${params?.serverId}/conversations/${member.id}`);
@@ -94,7 +138,7 @@ export function ChatItem({
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      content
+      content: mainContent
     }
   });
 
@@ -107,7 +151,11 @@ export function ChatItem({
         query: socketQuery
       });
 
-      await axios.patch(url, values);
+      const updatedContent = reply
+        ? `[reply:${JSON.stringify(reply)}]${values.content}`
+        : values.content;
+
+      await axios.patch(url, { content: updatedContent });
 
       form.reset();
       setIsEditing(false);
@@ -117,8 +165,8 @@ export function ChatItem({
   };
 
   useEffect(() => {
-    form.reset({ content });
-  }, [content, form]);
+    form.reset({ content: mainContent });
+  }, [mainContent, form]);
 
   const fileType = fileUrl?.split(".").pop();
 
@@ -136,21 +184,35 @@ export function ChatItem({
   const [userReactions, setUserReactions] = useState<Record<string, boolean>>({});
 
   const onCopy = () => {
-    if (!content) return;
-    navigator.clipboard.writeText(content);
+    if (!mainContent) return;
+    navigator.clipboard.writeText(mainContent);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const onQuoteReply = () => {
+  const onReply = () => {
     window.dispatchEvent(
-      new CustomEvent("chat_reply_quote", {
+      new CustomEvent("chat_reply", {
         detail: {
+          id,
           author: member.profile.name,
-          content: content
+          avatar: member.profile.imageUrl,
+          content: mainContent || (fileUrl ? (isPDF ? "PDF Document" : "Attachment") : "")
         }
       })
     );
+  };
+
+  const scrollToRepliedMessage = () => {
+    if (!reply?.id) return;
+    const el = document.getElementById(`message-${reply.id}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("bg-indigo-500/20", "transition-colors", "duration-500");
+      setTimeout(() => {
+        el.classList.remove("bg-indigo-500/20");
+      }, 1500);
+    }
   };
 
   const toggleReaction = (emoji: string) => {
@@ -171,16 +233,54 @@ export function ChatItem({
   };
 
   return (
-    <div className="relative group w-full px-3">
-      <div className="absolute left-5 top-0 bottom-0 w-px bg-indigo-300/70 dark:bg-indigo-300/25" />
-      <div className="relative ml-3 flex gap-x-2.5 items-start w-full border-t border-zinc-300/60 py-2 transition-colors duration-150 hover:bg-white/45 dark:border-white/10 dark:hover:bg-white/[0.04]">
+    <div
+      id={`message-${id}`}
+      className="relative group w-full px-4 py-1.5 transition-colors duration-150 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] rounded-lg"
+    >
+      {/* Discord-style Replied Message Header (Above Main Message) */}
+      {reply && !deleted && (
+        <div className="relative flex items-center gap-x-1.5 ml-10 mb-1 text-xs select-none">
+          {/* Curved spine connector line pointing to the replied message */}
+          <div className="absolute -left-[24px] top-[8px] h-[18px] w-[20px] border-l-2 border-t-2 border-zinc-400 dark:border-zinc-500/80 rounded-tl-[6px] pointer-events-none" />
+
+          {/* Small avatar of the replied user */}
+          {reply.avatar ? (
+            <img
+              src={reply.avatar}
+              alt={reply.name}
+              className="w-4 h-4 rounded-full object-cover shrink-0 ring-1 ring-white/10"
+            />
+          ) : (
+            <div className="w-4 h-4 rounded-full bg-indigo-500/20 text-indigo-400 font-bold text-[9px] flex items-center justify-center shrink-0">
+              {reply.name?.charAt(0).toUpperCase() || "?"}
+            </div>
+          )}
+
+          {/* Replied User Name */}
+          <span className="font-bold text-[12px] text-zinc-300 dark:text-zinc-300 hover:underline cursor-pointer shrink-0">
+            @{reply.name.replace(/^@/, "")}
+          </span>
+
+          {/* Replied Message Content Snippet */}
+          <span
+            onClick={scrollToRepliedMessage}
+            className="text-zinc-400 dark:text-zinc-400 text-[12px] truncate max-w-[65vw] md:max-w-[500px] hover:text-zinc-200 cursor-pointer transition-colors"
+            title={reply.content}
+          >
+            {reply.content}
+          </span>
+        </div>
+      )}
+
+      {/* Main Message Row */}
+      <div className="flex gap-x-3 items-start w-full">
         <div
           onClick={onMemberClick}
           className="cursor-pointer hover:drop-shadow-md transition pt-0.5 flex-shrink-0"
         >
           <UserAvatar
             src={member.profile.imageUrl}
-            className="h-7 w-7 md:h-7 md:w-7 ring-1 ring-black/5 dark:ring-white/10"
+            className="h-8 w-8 md:h-8 md:w-8 ring-1 ring-black/5 dark:ring-white/10"
           />
         </div>
         <div className="flex flex-col w-full min-w-0">
@@ -197,7 +297,11 @@ export function ChatItem({
                 {roleIconMap[member.role]}
               </ActionTooltip>
             </div>
+            <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
+              {timestamp}
+            </span>
           </div>
+
           {isImage && (
             <a
               href={fileUrl}
@@ -207,12 +311,13 @@ export function ChatItem({
             >
               <Image
                 src={fileUrl}
-                alt={content}
+                alt={mainContent || "Image"}
                 fill
                 className="object-cover"
               />
             </a>
           )}
+
           {isPDF && (
             <div className="relative flex items-center p-2 mt-1.5 rounded-lg bg-black/[0.03] dark:bg-white/[0.04] border border-black/5 dark:border-white/10 w-fit">
               <FileIcon className="h-8 w-8 fill-indigo-200 stroke-indigo-500" />
@@ -226,6 +331,7 @@ export function ChatItem({
               </a>
             </div>
           )}
+
           {!fileUrl && !isEditing && (
             <p
               className={cn(
@@ -234,7 +340,20 @@ export function ChatItem({
                   "italic text-zinc-400 dark:text-zinc-500 text-xs mt-0.5"
               )}
             >
-              {content}
+              {deleted
+                ? mainContent
+                : mainContent.split(/(@[a-zA-Z0-9_ ]+)/g).map((part, i) =>
+                    part.match(/^@[a-zA-Z0-9_ ]+$/) ? (
+                      <span
+                        key={i}
+                        className="inline-block rounded-[4px] bg-indigo-500/20 px-1 text-indigo-400 font-semibold hover:bg-indigo-500/30 cursor-pointer transition-colors"
+                      >
+                        {part}
+                      </span>
+                    ) : (
+                      <React.Fragment key={i}>{part}</React.Fragment>
+                    )
+                  )}
               {isUpdated && !deleted && (
                 <span className="text-[10px] mx-1.5 text-zinc-400 dark:text-zinc-500 font-medium">
                   (edited)
@@ -242,6 +361,7 @@ export function ChatItem({
               )}
             </p>
           )}
+
           {!fileUrl && isEditing && (
             <Form {...form}>
               <form
@@ -301,18 +421,11 @@ export function ChatItem({
               ))}
             </div>
           )}
-
-          <div className="mt-1 flex items-center gap-x-2">
-            <div className="h-px flex-1 bg-zinc-300/70 dark:bg-white/10" />
-            <span className="shrink-0 text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
-              {timestamp}
-            </span>
-          </div>
         </div>
       </div>
 
       {/* Hover Actions Menu */}
-      <div className="hidden group-hover:flex items-center gap-x-0.5 absolute p-1 top-0 right-7 bg-white/90 dark:bg-[#18191c]/90 border border-black/10 dark:border-white/10 rounded-xl shadow-xl backdrop-blur-md z-10 transition">
+      <div className="hidden group-hover:flex items-center gap-x-0.5 absolute p-1 -top-3 right-4 bg-white/90 dark:bg-[#18191c]/90 border border-black/10 dark:border-white/10 rounded-xl shadow-xl backdrop-blur-md z-10 transition">
         {/* Quick Reactions */}
         {["❤️", "👍", "🔥", "😂"].map((emoji) => (
           <button
@@ -327,7 +440,7 @@ export function ChatItem({
         <div className="w-px h-3 bg-black/10 dark:bg-white/10 mx-0.5" />
 
         {/* Copy Text Action */}
-        {!fileUrl && content && (
+        {!fileUrl && mainContent && (
           <ActionTooltip label={copied ? "Copied!" : "Copy Text"}>
             <button
               onClick={onCopy}
@@ -342,11 +455,11 @@ export function ChatItem({
           </ActionTooltip>
         )}
 
-        {/* Quote Reply Action */}
+        {/* Reply Action */}
         {!deleted && (
-          <ActionTooltip label="Quote Reply">
+          <ActionTooltip label="Reply">
             <button
-              onClick={onQuoteReply}
+              onClick={onReply}
               className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
             >
               <Reply className="w-3.5 h-3.5 text-zinc-400 hover:text-indigo-500" />

@@ -67,6 +67,7 @@ export default async function ChannelIdPage({
               channelId: channel.id,
               serverId: channel.serverId
             }}
+            serverId={channel.serverId}
           />
         </>
       )}
