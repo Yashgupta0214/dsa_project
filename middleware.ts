@@ -18,10 +18,8 @@ const isPublicRoute = (req: NextRequest) => {
 export default authMiddleware({
   publicRoutes: isPublicRoute,
   ignoredRoutes: [
-    "/sign-in(.*)",
-    "/sign-up(.*)",
-    "/api/socket/webhooks(.*)"
-  ]
+    "/api/socket/webhooks(.*)",
+  ],
 });
 
 export const config = {
