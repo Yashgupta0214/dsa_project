@@ -46,6 +46,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   const [token, setToken] = useState("");
   const [useFallbackStudio, setUseFallbackStudio] = useState(false);
   const [isLiveKitLoading, setIsLiveKitLoading] = useState(true);
+  const [liveKitError, setLiveKitError] = useState("");
 
   // WebRTC Local Studio Streams State
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
@@ -83,7 +84,8 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     if (!user?.id || isExpired) return;
 
     if (!livekitUrl) {
-      setUseFallbackStudio(true);
+      setUseFallbackStudio(false);
+      setLiveKitError("Voice channels need a LiveKit URL before multiple people can join the same call.");
       setIsLiveKitLoading(false);
       return;
     }
@@ -91,6 +93,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     (async () => {
       try {
         setIsLiveKitLoading(true);
+        setLiveKitError("");
         const params = new URLSearchParams({
           room: chatId,
           identity: getLiveKitIdentity(user.id),
@@ -101,18 +104,26 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
             "User",
         });
 
-        const response = await fetch(`/api/livekit?${params.toString()}`);
+        const response = await fetch(`/api/livekit?${params.toString()}`, {
+          credentials: "same-origin"
+        });
         const data = await response.json();
 
         if (!response.ok || !data.token) {
-          setUseFallbackStudio(true);
+          setUseFallbackStudio(false);
+          setLiveKitError(
+            data?.error ||
+              "LiveKit could not create a voice token. Check the server LiveKit API key and secret."
+          );
         } else {
           setToken(data.token);
           setUseFallbackStudio(false);
+          setLiveKitError("");
         }
       } catch (err) {
-        console.warn("LiveKit not reachable, switching to WebRTC studio:", err);
-        setUseFallbackStudio(true);
+        console.warn("LiveKit token request failed:", err);
+        setUseFallbackStudio(false);
+        setLiveKitError("LiveKit is not reachable from this app right now.");
       } finally {
         setIsLiveKitLoading(false);
       }
@@ -353,8 +364,9 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         serverUrl={livekitUrl}
         data-lk-theme="default"
         onError={(error) => {
-          console.error("LiveKit room error, falling back to WebRTC studio:", error);
-          setUseFallbackStudio(true);
+          console.error("LiveKit room error:", error);
+          setLiveKitError("LiveKit rejected the connection. Check that the URL, API key, and API secret all belong to the same LiveKit project.");
+          setUseFallbackStudio(false);
         }}
       >
         <VideoConference />
@@ -368,6 +380,35 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       <div className="flex flex-col flex-1 justify-center items-center bg-[#111214]">
         <Loader2 className="h-8 w-8 text-indigo-500 animate-spin my-4" />
         <p className="text-xs font-semibold text-zinc-400">Connecting to channel audio & video...</p>
+      </div>
+    );
+  }
+
+  if (liveKitError) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center bg-[#111214] p-6 text-center">
+        <div className="w-full max-w-lg rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-6 shadow-2xl backdrop-blur-md">
+          <div className="flex justify-center mb-3 text-indigo-400">
+            <Info className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-white">Voice Room Not Connected</h3>
+          <p className="text-xs text-zinc-300 mt-2 leading-relaxed">
+            {liveKitError}
+          </p>
+          <p className="text-xs text-zinc-400 mt-3 leading-relaxed">
+            The local preview cannot connect two devices together. Add valid{" "}
+            <code className="bg-black/40 text-amber-300 px-1.5 py-0.5 rounded font-mono">NEXT_PUBLIC_LIVEKIT_URL</code>,{" "}
+            <code className="bg-black/40 text-amber-300 px-1.5 py-0.5 rounded font-mono">LIVEKIT_API_KEY</code>, and{" "}
+            <code className="bg-black/40 text-amber-300 px-1.5 py-0.5 rounded font-mono">LIVEKIT_API_SECRET</code>, then restart{" "}
+            <code className="bg-black/40 text-amber-300 px-1.5 py-0.5 rounded font-mono">npm run dev</code>.
+          </p>
+          <Button
+            onClick={() => window.location.reload()}
+            className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 px-5 rounded-xl shadow-md shadow-indigo-500/20"
+          >
+            Retry Connection
+          </Button>
+        </div>
       </div>
     );
   }

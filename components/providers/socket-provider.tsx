@@ -35,13 +35,17 @@ export function SocketProvider({
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
 
-    const socketInstance = new (ClientIO as any)(
-      process.env.NEXT_PUBLIC_SITE_URL!,
-      {
-        path: "/api/socket/io",
-        addTrailingSlash: false
-      }
-    );
+    const socketUrl =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_SITE_URL;
+
+    if (!socketUrl) return;
+
+    const socketInstance = new (ClientIO as any)(socketUrl, {
+      path: "/api/socket/io",
+      addTrailingSlash: false
+    });
 
     socketInstance.on("connect", () => {
       setIsConnected(true);

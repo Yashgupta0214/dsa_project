@@ -32,6 +32,13 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  if (apiSecret.includes("•") || apiSecret.includes("â€¢") || apiSecret.length < 20) {
+    return NextResponse.json(
+      { error: "LIVEKIT_API_SECRET is not a valid project secret. Copy the real secret from LiveKit Cloud, not the redacted value." },
+      { status: 500 }
+    );
+  }
+
   const at = new AccessToken(apiKey, apiSecret, {
     identity,
     name: name ?? identity,
