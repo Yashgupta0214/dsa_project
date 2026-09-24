@@ -51,5 +51,5 @@ export async function GET(req: NextRequest) {
     canSubscribe: true,
   });
 
-  return NextResponse.json({ token: at.toJwt() });
+  return NextResponse.json({ token: at.toJwt(), wsUrl });
 }

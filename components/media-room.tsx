@@ -44,6 +44,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
 
   // LiveKit State
   const [token, setToken] = useState("");
+  const [liveKitServerUrl, setLiveKitServerUrl] = useState("");
   const [useFallbackStudio, setUseFallbackStudio] = useState(false);
   const [isLiveKitLoading, setIsLiveKitLoading] = useState(true);
   const [liveKitError, setLiveKitError] = useState("");
@@ -68,8 +69,6 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
-
   const getLiveKitIdentity = useCallback((userId: string) => {
     const randomPart =
       typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -82,13 +81,6 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   // 1. Fetch LiveKit Token if configured
   useEffect(() => {
     if (!user?.id || isExpired) return;
-
-    if (!livekitUrl) {
-      setUseFallbackStudio(false);
-      setLiveKitError("Voice channels need a LiveKit URL before multiple people can join the same call.");
-      setIsLiveKitLoading(false);
-      return;
-    }
 
     (async () => {
       try {
@@ -109,14 +101,15 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         });
         const data = await response.json();
 
-        if (!response.ok || !data.token) {
+        if (!response.ok || !data.token || !data.wsUrl) {
           setUseFallbackStudio(false);
           setLiveKitError(
             data?.error ||
-              "LiveKit could not create a voice token. Check the server LiveKit API key and secret."
+              "LiveKit could not create a voice connection. Check the server LiveKit URL, API key, and secret."
           );
         } else {
           setToken(data.token);
+          setLiveKitServerUrl(data.wsUrl);
           setUseFallbackStudio(false);
           setLiveKitError("");
         }
@@ -128,7 +121,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         setIsLiveKitLoading(false);
       }
     })();
-  }, [user?.id, user?.fullName, user?.username, user?.primaryEmailAddress, chatId, livekitUrl, isExpired, getLiveKitIdentity]);
+  }, [user?.id, user?.fullName, user?.username, user?.primaryEmailAddress, chatId, isExpired, getLiveKitIdentity]);
 
   // 2. Initialize Microphone for Audio Meter Visualizer
   const initAudio = useCallback(async () => {
@@ -354,14 +347,14 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   }
 
   // LiveKit Room Active
-  if (!useFallbackStudio && token !== "" && livekitUrl) {
+  if (!useFallbackStudio && token !== "" && liveKitServerUrl) {
     return (
       <LiveKitRoom
         video={video}
         audio={audio}
         token={token}
         connect={true}
-        serverUrl={livekitUrl}
+        serverUrl={liveKitServerUrl}
         data-lk-theme="default"
         onError={(error) => {
           console.error("LiveKit room error:", error);
