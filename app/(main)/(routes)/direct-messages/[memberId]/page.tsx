@@ -78,6 +78,7 @@ export default async function DirectMessagePage({
           name={otherMember.profile.name}
           serverId={otherMember.serverId}
           type="conversation"
+          chatId={conversation.id}
         />
         {video && <MediaRoom chatId={conversation.id} video audio />}
         {!video && (

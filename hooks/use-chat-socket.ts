@@ -64,6 +64,15 @@ export const useChatSocket = ({
           };
         }
 
+        // Deduplicate: avoid adding if already in the list
+        const exists = oldData.pages.some((page: any) =>
+          page.items?.some((item: any) => item.id === message.id)
+        );
+
+        if (exists) {
+          return oldData;
+        }
+
         const newData = [...oldData.pages];
 
         newData[0] = {

@@ -3,7 +3,7 @@
 import React, { useTransition } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { GradientLoader } from "@/components/ui/loader";
 
 import { cn } from "@/lib/utils";
 import { ActionTooltip } from "@/components/action-tooltip";
@@ -70,7 +70,7 @@ export function NavigationItem({
             )}
           />
           {isPending && (
-            <Loader2 className="absolute h-5 w-5 animate-spin text-white drop-shadow" />
+            <GradientLoader className="absolute h-5 w-5 drop-shadow" />
           )}
         </div>
       </button>

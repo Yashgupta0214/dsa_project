@@ -13,6 +13,7 @@ export type ModalType =
   | "editChannel"
   | "messageFile"
   | "deleteMessage"
+  | "pinMessage"
   | "joinServer"
   | "searchServers"
   | "editProfile"
@@ -26,6 +27,22 @@ interface ModalData {
   profile?: Profile;
   apiUrl?: string;
   query?: Record<string, any>;
+  message?: {
+    id: string;
+    content: string;
+    fileUrl?: string | null;
+    member?: {
+      profile?: {
+        name?: string;
+        imageUrl?: string;
+      };
+    };
+    pinned?: boolean;
+    pinnedAt?: string | null;
+    pinExpiresAt?: string | null;
+  };
+  socketUrl?: string;
+  socketQuery?: Record<string, string>;
 }
 
 interface ModalStore {

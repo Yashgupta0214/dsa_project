@@ -10,8 +10,11 @@ import {
   Trash,
   Copy,
   Check,
-  Reply
+  Reply,
+  Pin,
+  Clock
 } from "lucide-react";
+import { formatDistanceToNow, format } from "date-fns";
 import Image from "next/image";
 import * as z from "zod";
 import axios from "axios";
@@ -45,6 +48,9 @@ interface ChatItemProps {
   isUpdated: boolean;
   socketUrl: string;
   socketQuery: Record<string, string>;
+  pinned?: boolean;
+  pinnedAt?: string | null;
+  pinExpiresAt?: string | null;
 }
 
 const roleIconMap = {
@@ -109,13 +115,22 @@ export function ChatItem({
   currentMember,
   isUpdated,
   socketUrl,
-  socketQuery
+  socketQuery,
+  pinned = false,
+  pinnedAt = null,
+  pinExpiresAt = null
 }: ChatItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const { onOpen } = useModal();
 
   const params = useParams();
   const router = useRouter();
+
+  const isPinnedActive = Boolean(
+    pinned &&
+    (!pinExpiresAt || new Date(pinExpiresAt) > new Date()) &&
+    !deleted
+  );
 
   const { reply, mainContent } = parseMessageContent(content);
 
@@ -300,6 +315,25 @@ export function ChatItem({
             <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
               {timestamp}
             </span>
+            {isPinnedActive && (
+              <ActionTooltip
+                label={
+                  pinExpiresAt
+                    ? `Pinned • Expires in ${formatDistanceToNow(new Date(pinExpiresAt))} (${format(new Date(pinExpiresAt), "MMM d, yyyy 'at' h:mm a")})`
+                    : "Pinned Permanently (Until unpinned)"
+                }
+              >
+                <div className="inline-flex items-center gap-x-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-500/20 via-fuchsia-500/20 to-pink-500/20 border border-purple-500/30 text-[10px] font-semibold text-purple-300 dark:text-purple-200 shadow-sm cursor-help animate-in fade-in zoom-in-95 duration-200">
+                  <Pin className="w-2.5 h-2.5 fill-purple-400 text-purple-400" />
+                  <span>Pinned</span>
+                  {pinExpiresAt && (
+                    <span className="text-pink-300/80 font-normal">
+                      • {formatDistanceToNow(new Date(pinExpiresAt))}
+                    </span>
+                  )}
+                </div>
+              </ActionTooltip>
+            )}
           </div>
 
           {isImage && (
@@ -463,6 +497,37 @@ export function ChatItem({
               className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
             >
               <Reply className="w-3.5 h-3.5 text-zinc-400 hover:text-indigo-500" />
+            </button>
+          </ActionTooltip>
+        )}
+
+        {/* Pin / Unpin Action */}
+        {!deleted && (
+          <ActionTooltip label={isPinnedActive ? "Edit Pin / Unpin" : "Pin Message"}>
+            <button
+              onClick={() =>
+                onOpen("pinMessage", {
+                  message: {
+                    id,
+                    content,
+                    fileUrl,
+                    member,
+                    pinned,
+                    pinnedAt,
+                    pinExpiresAt
+                  },
+                  socketUrl,
+                  socketQuery
+                })
+              }
+              className={cn(
+                "p-1 rounded-lg transition",
+                isPinnedActive
+                  ? "bg-purple-500/15 text-purple-400 hover:bg-purple-500/25"
+                  : "hover:bg-black/5 dark:hover:bg-white/5 text-zinc-400 hover:text-purple-400"
+              )}
+            >
+              <Pin className={cn("w-3.5 h-3.5", isPinnedActive && "fill-current")} />
             </button>
           </ActionTooltip>
         )}

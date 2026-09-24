@@ -61,6 +61,7 @@ export default async function MemberIdPage({
         name={otherMember.profile.name}
         serverId={serverId}
         type="conversation"
+        chatId={conversation.id}
       />
       {video && <MediaRoom chatId={conversation.id} video audio />}
       {!video && (

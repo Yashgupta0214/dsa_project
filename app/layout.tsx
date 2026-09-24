@@ -57,10 +57,12 @@ export default function RootLayout({
             storageKey="discord-clone-theme"
           >
             <SocketProvider>
-              <NotificationProvider>
-                <ModalProvider />
-                <QueryProvider>{children}</QueryProvider>
-              </NotificationProvider>
+              <QueryProvider>
+                <NotificationProvider>
+                  <ModalProvider />
+                  {children}
+                </NotificationProvider>
+              </QueryProvider>
             </SocketProvider>
           </ThemeProvider>
         </ClerkProvider>

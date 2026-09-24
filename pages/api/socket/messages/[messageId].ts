@@ -1,8 +1,8 @@
 import { NextApiRequest } from "next";
 import { MemberRole } from "@prisma/client";
+import { getAuth } from "@clerk/nextjs/server";
 
 import { NextApiResponseServerIo } from "@/types";
-import { currentProfilePages } from "@/lib/current-profile-pages";
 import { db } from "@/lib/db";
 
 export default async function handler(
@@ -13,11 +13,10 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const profile = await currentProfilePages(req);
-    const { content } = req.body;
+    const { userId } = getAuth(req);
     const { serverId, channelId, messageId } = req.query;
 
-    if (!profile) return res.status(401).json({ error: "Unauthorized" });
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     if (!serverId)
       return res.status(400).json({ error: "Server ID Missing" });
@@ -25,63 +24,37 @@ export default async function handler(
     if (!channelId)
       return res.status(400).json({ error: "Channel ID Missing" });
 
-    const server = await db.server.findFirst({
-      where: {
-        id: serverId as string,
-        members: {
-          some: {
-            profileId: profile.id
-          }
+    // Single parallel batch to verify member and locate message
+    const [member, existingMessage] = await Promise.all([
+      db.member.findFirst({
+        where: {
+          serverId: serverId as string,
+          profile: { userId }
         }
-      },
-      include: {
-        members: true
-      }
-    });
-
-    if (!server)
-      return res.status(404).json({ error: "Server not found" });
-
-    const channel = await db.channel.findFirst({
-      where: {
-        id: channelId as string,
-        serverId: serverId as string
-      }
-    });
-
-    if (!channel)
-      return res.status(404).json({ error: "Channel not found" });
-
-    const member = server.members.find(
-      (member) => member.profileId === profile.id
-    );
+      }),
+      db.message.findFirst({
+        where: {
+          id: messageId as string,
+          channelId: channelId as string
+        }
+      })
+    ]);
 
     if (!member)
       return res.status(404).json({ error: "Member not found" });
 
-    let message = await db.message.findFirst({
-      where: {
-        id: messageId as string,
-        channelId: channelId as string
-      },
-      include: {
-        member: {
-          include: {
-            profile: true
-          }
-        }
-      }
-    });
-
-    if (!message || message.deleted)
+    if (!existingMessage || existingMessage.deleted)
       return res.status(404).json({ error: "Message not found" });
 
-    const isMessageOwner = message.memberId === member.id;
+    const isMessageOwner = existingMessage.memberId === member.id;
     const isAdmin = member.role === MemberRole.ADMIN;
     const isModerator = member.role === MemberRole.MODERATOR;
-    const canModify = isMessageOwner || isAdmin || isModerator;
+    const isPinAction = typeof req.body.pinned === "boolean";
+    const canModify = isPinAction ? true : (isMessageOwner || isAdmin || isModerator);
 
     if (!canModify) return res.status(401).json({ error: "Unauthorized" });
+
+    let message;
 
     if (req.method === "DELETE") {
       message = await db.message.update({
@@ -91,7 +64,10 @@ export default async function handler(
         data: {
           fileUrl: null,
           content: "This message has been deleted.",
-          deleted: true
+          deleted: true,
+          pinned: false,
+          pinnedAt: null,
+          pinExpiresAt: null
         },
         include: {
           member: {
@@ -104,16 +80,30 @@ export default async function handler(
     }
 
     if (req.method === "PATCH") {
-      if (!isMessageOwner)
-        return res.status(401).json({ error: "Unauthorized" });
+      const { content, pinned, pinExpiresAt } = req.body;
+      const updateData: any = {};
+
+      if (typeof pinned === "boolean") {
+        updateData.pinned = pinned;
+        updateData.pinnedAt = pinned ? new Date() : null;
+        updateData.pinExpiresAt = pinned
+          ? pinExpiresAt
+            ? new Date(pinExpiresAt)
+            : null
+          : null;
+      }
+
+      if (typeof content === "string") {
+        if (!isMessageOwner)
+          return res.status(401).json({ error: "Unauthorized" });
+        updateData.content = content;
+      }
 
       message = await db.message.update({
         where: {
           id: messageId as string
         },
-        data: {
-          content
-        },
+        data: updateData,
         include: {
           member: {
             include: {
@@ -125,8 +115,10 @@ export default async function handler(
     }
 
     const updateKey = `chat:${channelId}:messages:update`;
+    const pinKey = `chat:${channelId}:pins:update`;
 
     res?.socket?.server?.io?.emit(updateKey, message);
+    res?.socket?.server?.io?.emit(pinKey, message);
 
     return res.status(200).json(message);
   } catch (error) {

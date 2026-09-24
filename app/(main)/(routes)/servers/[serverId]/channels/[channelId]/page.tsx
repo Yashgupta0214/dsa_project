@@ -42,6 +42,7 @@ export default async function ChannelIdPage({
         name={channel.name}
         serverId={channel.serverId}
         type="channel"
+        chatId={channel.id}
       />
       {channel.type === ChannelType.TEXT && (
         <>

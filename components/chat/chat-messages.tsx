@@ -2,7 +2,8 @@
 
 import React, { Fragment, useRef, ElementRef } from "react";
 import { Member, Message, Profile } from "@prisma/client";
-import { Loader2, ServerCrash } from "lucide-react";
+import { ServerCrash } from "lucide-react";
+import { GradientLoader } from "@/components/ui/loader";
 import { format } from "date-fns";
 
 import { ChatWelcome } from "@/components/chat/chat-welcome";
@@ -72,8 +73,8 @@ export function ChatMessages({
   if (status === "loading")
     return (
       <div className="flex flex-col flex-1 justify-center items-center">
-        <Loader2 className="h-7 w-7 text-zinc-500 animate-spin my-4" />
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        <GradientLoader className="h-8 w-8 my-4" />
+        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
           Loading messages...
         </p>
       </div>
@@ -99,7 +100,7 @@ export function ChatMessages({
       {hasNextPage && (
         <div className="flex justify-center">
           {isFetchingNextPage ? (
-            <Loader2 className="h-6 w-6 text-zinc-500 animate-spin my-4" />
+            <GradientLoader className="h-6 w-6 my-4" />
           ) : (
             <button
               onClick={() => fetchNextPage()}
@@ -129,6 +130,9 @@ export function ChatMessages({
                 isUpdated={message.updatedAt !== message.createdAt}
                 socketQuery={socketQuery}
                 socketUrl={socketUrl}
+                pinned={(message as any).pinned}
+                pinnedAt={(message as any).pinnedAt}
+                pinExpiresAt={(message as any).pinExpiresAt}
               />
             ))}
           </Fragment>

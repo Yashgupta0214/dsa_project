@@ -119,34 +119,34 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
   const isLoading = form.formState.isSubmitting;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (isLoading) return;
-
     const trimmedContent = values.content.trim();
     if (!trimmedContent) return;
 
+    const url = qs.stringifyUrl({
+      url: apiUrl,
+      query
+    });
+
+    let contentToSend = trimmedContent;
+    if (replyingTo) {
+      const replyPayload = {
+        id: replyingTo.id,
+        name: replyingTo.author,
+        avatar: replyingTo.avatar,
+        content: replyingTo.content.slice(0, 150)
+      };
+      contentToSend = `[reply:${JSON.stringify(replyPayload)}]${trimmedContent}`;
+    }
+
+    // Instantly reset input and reply preview (0ms latency for user)
+    form.reset({ content: "" });
+    setReplyingTo(null);
+    inputRef.current?.focus();
+
     try {
-      const url = qs.stringifyUrl({
-        url: apiUrl,
-        query
-      });
-
-      let contentToSend = trimmedContent;
-      if (replyingTo) {
-        const replyPayload = {
-          id: replyingTo.id,
-          name: replyingTo.author,
-          avatar: replyingTo.avatar,
-          content: replyingTo.content.slice(0, 150)
-        };
-        contentToSend = `[reply:${JSON.stringify(replyPayload)}]${trimmedContent}`;
-      }
-
-      form.reset();
-      setReplyingTo(null);
-
       await axios.post(url, { content: contentToSend });
     } catch (error) {
-      console.error(error);
+      console.error("Error sending message:", error);
     }
   };
 
@@ -334,7 +334,7 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
                     </div>
                     <button
                       type="submit"
-                      disabled={isLoading || !field.value || !field.value.trim()}
+                      disabled={!field.value || !field.value.trim()}
                       className="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-500 text-white shadow-md shadow-indigo-500/25 transition hover:bg-indigo-600 disabled:cursor-not-allowed disabled:bg-zinc-700/50 disabled:text-zinc-500 disabled:shadow-none"
                     >
                       <SendHorizonal className="h-3.5 w-3.5" />

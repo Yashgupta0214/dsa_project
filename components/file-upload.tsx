@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { FileIcon, Loader2, UploadCloud, X } from "lucide-react";
+import { FileIcon, UploadCloud, X } from "lucide-react";
+import { GradientLoader } from "@/components/ui/loader";
 import Image from "next/image";
 
 import { cn } from "@/lib/utils";
@@ -138,7 +139,7 @@ export function FileUpload({
           {endpoint === "serverImage" ? "IMAGE" : "IMAGE, PDF"} up to 4MB
         </span>
         {isUploading && (
-          <Loader2 className="mt-5 h-5 w-5 animate-spin text-indigo-500" />
+          <GradientLoader className="mt-5 h-6 w-6" />
         )}
       </button>
       {error && (

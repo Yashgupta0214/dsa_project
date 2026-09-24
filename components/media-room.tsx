@@ -8,7 +8,7 @@ import {
   VideoConference,
 } from "@livekit/components-react";
 import { useUser } from "@clerk/nextjs";
-import { Loader2 } from "lucide-react";
+import { GradientLoader } from "@/components/ui/loader";
 
 interface MediaRoomProps {
   chatId: string;
@@ -101,9 +101,9 @@ export function MediaRoom({ chatId, video, audio }: MediaRoomProps) {
   if (token === "")
     return (
       <div className="flex flex-col flex-1 justify-center items-center">
-        <Loader2 className="h-7 w-7 text-zinc-500 animate-spin my-4" />
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Loading...
+        <GradientLoader className="h-8 w-8 my-4" />
+        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+          Loading call...
         </p>
       </div>
     );

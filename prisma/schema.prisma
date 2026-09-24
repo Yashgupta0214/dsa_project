@@ -95,20 +95,24 @@ model Webhook {
 }
 
 model Message {
-  id        String   @id @default(uuid())
-  content   String   @db.Text
-  fileUrl   String?  @db.Text
-  memberId  String
-  channelId String
-  deleted   Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  id           String    @id @default(uuid())
+  content      String    @db.Text
+  fileUrl      String?   @db.Text
+  memberId     String
+  channelId    String
+  deleted      Boolean   @default(false)
+  pinned       Boolean   @default(false)
+  pinnedAt     DateTime?
+  pinExpiresAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  member       Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  channel      Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   @@index([channelId])
   @@index([memberId])
   @@index([channelId, createdAt])
+  @@index([channelId, pinned])
 }
 
 model Conversation {
@@ -131,6 +135,9 @@ model DirectMessage {
   memberId       String
   conversationId String
   deleted        Boolean      @default(false)
+  pinned         Boolean      @default(false)
+  pinnedAt       DateTime?
+  pinExpiresAt   DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   member         Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -139,6 +146,7 @@ model DirectMessage {
   @@index([memberId])
   @@index([conversationId])
   @@index([conversationId, createdAt])
+  @@index([conversationId, pinned])
 }
 
 enum MemberRole {

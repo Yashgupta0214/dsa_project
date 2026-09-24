@@ -17,6 +17,7 @@ import { JoinServerModal } from "@/components/modals/join-server-modal";
 import { SearchServersModal } from "@/components/modals/search-servers-modal";
 import { EditProfileModal } from "@/components/modals/edit-profile-modal";
 import { UserSettingsModal } from "@/components/modals/user-settings-modal";
+import { PinMessageModal } from "@/components/modals/pin-message-modal";
 
 export function ModalProvider() {
   const [isMounted, setIsMounted] = useState(false);
@@ -40,6 +41,7 @@ export function ModalProvider() {
       <EditChannelModal />
       <MessageFileModal />
       <DeleteMessageModal />
+      <PinMessageModal />
       <JoinServerModal />
       <SearchServersModal />
       <EditProfileModal />

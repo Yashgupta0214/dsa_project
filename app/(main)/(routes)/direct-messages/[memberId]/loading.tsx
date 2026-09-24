@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { GradientLoader } from "@/components/ui/loader";
 
 export default function DirectMessageLoading() {
   return (
@@ -10,8 +10,8 @@ export default function DirectMessageLoading() {
           <div className="h-4 w-32 rounded bg-zinc-300/70 dark:bg-white/10" />
         </div>
         <div className="flex flex-1 flex-col items-center justify-center">
-          <Loader2 className="my-4 h-7 w-7 animate-spin text-zinc-500" />
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          <GradientLoader className="my-4 h-8 w-8" />
+          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
             Opening conversation...
           </p>
         </div>
