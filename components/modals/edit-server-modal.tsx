@@ -89,7 +89,7 @@ export function EditServerModal() {
   // Temporary Server Mode State
   const [isTemporary, setIsTemporary] = useState(false);
   const [expiryTimestamp, setExpiryTimestamp] = useState<number | null>(null);
-  const [expiryAction, setExpiryAction] = useState<"archive" | "delete">("archive");
+  const [expiryAction, setExpiryAction] = useState<"archive" | "delete">("delete");
   const [countdownText, setCountdownText] = useState("");
 
   // Webhooks State
@@ -203,6 +203,12 @@ export function EditServerModal() {
 
   const setExpiryDays = (days: number) => {
     const target = Date.now() + days * 24 * 60 * 60 * 1000;
+    setIsTemporary(true);
+    setExpiryTimestamp(target);
+  };
+
+  const setExpiryMinutes = (minutes: number) => {
+    const target = Date.now() + minutes * 60 * 1000;
     setIsTemporary(true);
     setExpiryTimestamp(target);
   };
@@ -639,11 +645,17 @@ export function EditServerModal() {
                     <div className="flex items-center justify-between p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
                       <div>
                         <p className="text-xs font-bold text-amber-500">Enable Temporary Lifespan</p>
-                        <p className="text-[11px] text-zinc-500">Auto archive or delete when countdown finishes</p>
+                        <p className="text-[11px] text-zinc-500">Auto archive or auto delete when countdown finishes</p>
                       </div>
                       <button
                         type="button"
-                        onClick={() => setIsTemporary(!isTemporary)}
+                        onClick={() => {
+                          const nextVal = !isTemporary;
+                          setIsTemporary(nextVal);
+                          if (nextVal && !expiryTimestamp) {
+                            setExpiryDays(1);
+                          }
+                        }}
                         className={`w-11 h-6 rounded-full p-1 transition-colors ${
                           isTemporary ? "bg-amber-500" : "bg-zinc-300 dark:bg-zinc-700"
                         }`}
@@ -657,37 +669,150 @@ export function EditServerModal() {
                     </div>
 
                     {isTemporary && (
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-3 gap-3">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setExpiryDays(1)}
-                            className="text-xs"
-                          >
-                            1 Day
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setExpiryDays(7)}
-                            className="text-xs"
-                          >
-                            7 Days
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setExpiryDays(30)}
-                            className="text-xs"
-                          >
-                            30 Days
-                          </Button>
+                      <div className="space-y-4">
+                        {/* Expiry Action Selection */}
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                            Action Upon Expiration
+                          </label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setExpiryAction("delete")}
+                              className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition ${
+                                expiryAction === "delete"
+                                  ? "border-rose-500 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold"
+                                  : "border-black/5 dark:border-white/10 text-zinc-600 dark:text-zinc-400 hover:bg-black/5"
+                              }`}
+                            >
+                              <Trash2 className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                              <div>
+                                <p className="text-xs font-bold">Auto-Delete Server</p>
+                                <p className="text-[10px] text-zinc-500 font-normal">
+                                  Sends 5-min chat alert, locks messaging, then permanently deletes server.
+                                </p>
+                              </div>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setExpiryAction("archive")}
+                              className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition ${
+                                expiryAction === "archive"
+                                  ? "border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold"
+                                  : "border-black/5 dark:border-white/10 text-zinc-600 dark:text-zinc-400 hover:bg-black/5"
+                              }`}
+                            >
+                              <Archive className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                              <div>
+                                <p className="text-xs font-bold">Archive (Read-Only)</p>
+                                <p className="text-[10px] text-zinc-500 font-normal">
+                                  Locks server chat into read-only mode after expiry.
+                                </p>
+                              </div>
+                            </button>
+                          </div>
                         </div>
+
+                        {/* Quick Presets */}
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">
+                            Select Expiry Duration
+                          </label>
+                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setExpiryMinutes(1)}
+                              className="text-xs h-9 px-2 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                            >
+                              1 Min (Test)
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setExpiryMinutes(5)}
+                              className="text-xs h-9 px-2 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                            >
+                              5 Mins
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setExpiryMinutes(60)}
+                              className="text-xs h-9 px-2"
+                            >
+                              1 Hour
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setExpiryDays(1)}
+                              className="text-xs h-9 px-2"
+                            >
+                              1 Day
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setExpiryDays(7)}
+                              className="text-xs h-9 px-2"
+                            >
+                              7 Days
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setExpiryDays(30)}
+                              className="text-xs h-9 px-2"
+                            >
+                              30 Days
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Custom Datetime Input */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400">
+                            Or Set Custom Expiry Date & Time:
+                          </label>
+                          <input
+                            type="datetime-local"
+                            value={
+                              expiryTimestamp
+                                ? new Date(expiryTimestamp - new Date().getTimezoneOffset() * 60000)
+                                    .toISOString()
+                                    .slice(0, 16)
+                                : ""
+                            }
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setExpiryTimestamp(new Date(e.target.value).getTime());
+                              }
+                            }}
+                            className="w-full bg-zinc-100 dark:bg-[#111214] border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Status Card */}
                         {countdownText && (
-                          <p className="text-xs text-amber-400 font-mono text-center">
-                            Time Remaining: {countdownText}
-                          </p>
+                          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
+                            <div>
+                              <p className="text-[11px] uppercase font-bold text-zinc-500">Live Status</p>
+                              <p className="text-xs font-mono font-bold text-amber-500 mt-0.5">
+                                {countdownText}
+                              </p>
+                            </div>
+
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => setExpiryDays(1)}
+                              className="bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs h-8 px-3"
+                            >
+                              +1 Day Lifespan
+                            </Button>
+                          </div>
                         )}
                       </div>
                     )}

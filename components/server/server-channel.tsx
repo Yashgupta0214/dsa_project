@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ActionTooltip } from "@/components/action-tooltip";
 import { ModalType, useModal } from "@/hooks/use-modal-store";
+import { useServerTemporary } from "@/hooks/use-server-temporary";
 
 interface ServerChannelProps {
   channel: Channel;
@@ -27,6 +28,7 @@ export function ServerChannel({
   role
 }: ServerChannelProps) {
   const { onOpen } = useModal();
+  const { isExpired } = useServerTemporary(server?.id);
   const params = useParams();
   const router = useRouter();
 
@@ -73,7 +75,7 @@ export function ServerChannel({
       >
         {channel.name}
       </p>
-      {channel.name !== "general" && role !== MemberRole.GUEST && (
+      {!isExpired && channel.name !== "general" && role !== MemberRole.GUEST && (
         <div className="ml-auto flex items-center gap-x-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <ActionTooltip label="Edit">
             <Edit
@@ -89,9 +91,10 @@ export function ServerChannel({
           </ActionTooltip>
         </div>
       )}
-      {channel.name === "general" && (
+      {(isExpired || channel.name === "general") && (
         <Lock className="ml-auto w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500" />
       )}
     </button>
   );
 }
+

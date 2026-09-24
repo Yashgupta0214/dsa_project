@@ -9,6 +9,9 @@ import axios from "axios";
 import qs from "query-string";
 import { useRouter } from "next/navigation";
 import { Member, MemberRole, Profile } from "@prisma/client";
+import { Lock, Timer, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useServerTemporary } from "@/hooks/use-server-temporary";
 
 import {
   FormControl,
@@ -122,31 +125,39 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
     const trimmedContent = values.content.trim();
     if (!trimmedContent) return;
 
-    const url = qs.stringifyUrl({
-      url: apiUrl,
-      query
-    });
-
-    let contentToSend = trimmedContent;
-    if (replyingTo) {
-      const replyPayload = {
-        id: replyingTo.id,
-        name: replyingTo.author,
-        avatar: replyingTo.avatar,
-        content: replyingTo.content.slice(0, 150)
-      };
-      contentToSend = `[reply:${JSON.stringify(replyPayload)}]${trimmedContent}`;
-    }
-
-    // Instantly reset input and reply preview (0ms latency for user)
-    form.reset({ content: "" });
-    setReplyingTo(null);
-    inputRef.current?.focus();
-
     try {
-      await axios.post(url, { content: contentToSend });
+      const url = qs.stringifyUrl({
+        url: apiUrl,
+        query
+      });
+
+      let contentToSend = trimmedContent;
+      if (replyingTo) {
+        const replyPayload = {
+          id: replyingTo.id,
+          name: replyingTo.author,
+          avatar: replyingTo.avatar,
+          content: replyingTo.content.slice(0, 150)
+        };
+        contentToSend = `[reply:${JSON.stringify(replyPayload)}]${trimmedContent}`;
+      }
+
+      // ⚡ Instant UI Reset (0ms latency feedback for send button & input box)
+      form.setValue("content", "");
+      form.reset({ content: "" });
+      setReplyingTo(null);
+
+      // Re-focus input immediately so consecutive messages are effortless
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+
+      // Asynchronous non-blocking message submission
+      axios.post(url, { content: contentToSend }).catch((error) => {
+        console.error("Failed to send message:", error);
+      });
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error(error);
     }
   };
 
@@ -255,6 +266,48 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const channelId = query?.channelId;
+  const { isExpired, timeUntilDeletion, extendLifespan, expiryAction } = useServerTemporary(
+    serverId,
+    channelId
+  );
+
+  if (isExpired) {
+    const mins = Math.floor(timeUntilDeletion / 60);
+    const secs = timeUntilDeletion % 60;
+    const timeFormatted = `${mins}m ${secs < 10 ? "0" : ""}${secs}s`;
+
+    return (
+      <div className="px-3 pb-3 pt-1">
+        <div className="p-4 bg-gradient-to-r from-rose-500/15 via-amber-500/10 to-rose-500/15 border border-rose-500/30 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left backdrop-blur-md shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-500 shrink-0">
+              <Lock className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-rose-500 flex items-center gap-1.5 justify-center sm:justify-start">
+                <span>🔒 Server Expired — All messaging & features disabled</span>
+              </p>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                {expiryAction === "delete"
+                  ? `Auto-deleting server in ${timeFormatted}. Only extending server lifespan will restore full chat access.`
+                  : "Server is locked in Read-Only mode. Messaging is disabled."}
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            onClick={() => extendLifespan(1)}
+            className="bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs shrink-0 shadow-md shadow-amber-500/20 h-9 px-4 rounded-xl"
+          >
+            <Timer className="w-4 h-4 mr-1.5" />
+            Extend Lifespan (+1 Day)
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="px-3 pb-3 pt-1">
@@ -334,7 +387,7 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
                     </div>
                     <button
                       type="submit"
-                      disabled={!field.value || !field.value.trim()}
+                      disabled={isLoading || !field.value || !field.value.trim()}
                       className="mr-2 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-500 text-white shadow-md shadow-indigo-500/25 transition hover:bg-indigo-600 disabled:cursor-not-allowed disabled:bg-zinc-700/50 disabled:text-zinc-500 disabled:shadow-none"
                     >
                       <SendHorizonal className="h-3.5 w-3.5" />

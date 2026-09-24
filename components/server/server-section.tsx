@@ -7,6 +7,7 @@ import { Plus, Settings } from "lucide-react";
 import { ServerWithMembersWithProfiles } from "@/types";
 import { ActionTooltip } from "@/components/action-tooltip";
 import { useModal } from "@/hooks/use-modal-store";
+import { useServerTemporary } from "@/hooks/use-server-temporary";
 
 interface ServerSectionProps {
   label: string;
@@ -24,13 +25,14 @@ export function ServerSection({
   server
 }: ServerSectionProps) {
   const { onOpen } = useModal();
+  const { isExpired } = useServerTemporary(server?.id);
 
   return (
     <div className="flex items-center justify-between py-2 px-1">
       <p className="text-[11px] uppercase tracking-wider font-bold text-zinc-500 dark:text-zinc-400">
         {label}
       </p>
-      {role !== MemberRole.GUEST && sectionType === "channels" && (
+      {!isExpired && role !== MemberRole.GUEST && sectionType === "channels" && (
         <ActionTooltip label="Create Channel" side="top">
           <button
             onClick={() => onOpen("createChannel", { channelType })}
@@ -40,7 +42,7 @@ export function ServerSection({
           </button>
         </ActionTooltip>
       )}
-      {role === MemberRole.ADMIN && sectionType === "members" && (
+      {!isExpired && role === MemberRole.ADMIN && sectionType === "members" && (
         <ActionTooltip label="Manage Members" side="top">
           <button
             onClick={() => onOpen("members", { server })}
@@ -53,3 +55,4 @@ export function ServerSection({
     </div>
   );
 }
+

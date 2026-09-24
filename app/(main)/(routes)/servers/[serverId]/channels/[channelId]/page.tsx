@@ -9,6 +9,7 @@ import { ChatHeader } from "@/components/chat/chat-header";
 import { ChatInput } from "@/components/chat/chat-input";
 import { ChatMessages } from "@/components/chat/chat-messages";
 import { MediaRoom } from "@/components/media-room";
+import { TemporaryServerBanner } from "@/components/server/temporary-server-banner";
 
 interface ChannelIdPageProps {
   params: {
@@ -38,6 +39,7 @@ export default async function ChannelIdPage({
     <div className="relative flex flex-col h-full overflow-hidden bg-white dark:bg-[linear-gradient(180deg,#20222a_0%,#16171d_100%)]">
       <div className="pointer-events-none absolute inset-0 dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.16)_0%,transparent_40%,rgba(20,184,166,0.1)_100%)]" />
       <div className="relative z-10 flex h-full flex-col">
+      <TemporaryServerBanner serverId={channel.serverId} channelId={channel.id} />
       <ChatHeader
         name={channel.name}
         serverId={channel.serverId}
@@ -73,10 +75,10 @@ export default async function ChannelIdPage({
         </>
       )}
       {channel.type === ChannelType.AUDIO && (
-        <MediaRoom chatId={channel.id} video={false} audio={true} />
+        <MediaRoom chatId={channel.id} video={false} audio={true} serverId={channel.serverId} />
       )}
       {channel.type === ChannelType.VIDEO && (
-        <MediaRoom chatId={channel.id} video={true} audio={true} />
+        <MediaRoom chatId={channel.id} video={true} audio={true} serverId={channel.serverId} />
       )}
       </div>
     </div>

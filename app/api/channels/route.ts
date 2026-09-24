@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { MemberRole } from "@prisma/client";
+import { ChannelType, MemberRole } from "@prisma/client";
 
 import { currentProfile } from "@/lib/current-profile";
 import { db } from "@/lib/db";
@@ -43,33 +43,38 @@ export async function POST(req: Request) {
     if (!serverId)
       return new NextResponse("Server ID is Missing", { status: 400 });
 
-    if (name === "general")
+    if (name.toLowerCase() === "general")
       return new NextResponse("Name cannot be 'general'", { status: 400 });
 
-    const server = await db.server.update({
+    const member = await db.member.findFirst({
       where: {
-        id: serverId,
-        members: {
-          some: {
-            profileId: profile.id,
-            role: {
-              in: [MemberRole.ADMIN, MemberRole.MODERATOR]
-            }
-          }
-        }
-      },
-      data: {
-        channels: {
-          create: {
-            profileId: profile.id,
-            name,
-            type
-          }
+        serverId,
+        profileId: profile.id,
+        role: {
+          in: [MemberRole.ADMIN, MemberRole.MODERATOR]
         }
       }
     });
 
-    return NextResponse.json(server);
+    if (!member) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+
+    const sanitizedName =
+      type === ChannelType.TEXT
+        ? name.trim().toLowerCase().replace(/\s+/g, "-")
+        : name.trim();
+
+    const channel = await db.channel.create({
+      data: {
+        profileId: profile.id,
+        serverId,
+        name: sanitizedName,
+        type: type || ChannelType.TEXT
+      }
+    });
+
+    return NextResponse.json(channel);
   } catch (error) {
     console.error("[CHANNELS_POST]", error);
     return new NextResponse("Internal Error", { status: 500 });

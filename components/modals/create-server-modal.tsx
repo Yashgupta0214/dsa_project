@@ -49,6 +49,7 @@ export function CreateServerModal() {
 
   const [isTemporary, setIsTemporary] = React.useState(false);
   const [expiryDays, setExpiryDays] = React.useState(7);
+  const [expiryAction, setExpiryAction] = React.useState<"archive" | "delete">("delete");
   const [customTimestamp, setCustomTimestamp] = React.useState<number | null>(null);
 
   const isLoading = form.formState.isSubmitting;
@@ -63,7 +64,7 @@ export function CreateServerModal() {
         const extendedSettings = {
           isTemporary: true,
           expiryTimestamp: finalExpiry,
-          expiryAction: "archive"
+          expiryAction: expiryAction
         };
         localStorage.setItem(
           `server_settings_${newServer.id}`,
@@ -140,14 +141,14 @@ export function CreateServerModal() {
               />
 
               {/* Temporary Server Mode Toggle */}
-              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <p className="text-xs font-bold text-amber-600 dark:text-amber-400">
                       Set as Temporary Server
                     </p>
                     <p className="text-[11px] text-zinc-500">
-                      Auto-expires after a set period (study group, hackathon, event)
+                      Auto-expires after a set period (study group, event, test server)
                     </p>
                   </div>
                   <button
@@ -166,32 +167,75 @@ export function CreateServerModal() {
                 </div>
 
                 {isTemporary && (
-                  <div className="space-y-2 pt-1">
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {[
-                        { label: "1 Day", days: 1 },
-                        { label: "7 Days", days: 7 },
-                        { label: "14 Days", days: 14 },
-                        { label: "30 Days", days: 30 }
-                      ].map((p) => (
+                  <div className="space-y-3 pt-1">
+                    {/* Action Selector */}
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 block">
+                        Action Upon Expiry:
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
                         <button
-                          key={p.days}
                           type="button"
-                          onClick={() => setExpiryDays(p.days)}
-                          className={`p-1.5 rounded-lg border text-xs font-semibold transition ${
-                            expiryDays === p.days
-                              ? "border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-400"
-                              : "border-black/5 dark:border-white/10 hover:bg-black/5 text-zinc-600 dark:text-zinc-400"
+                          onClick={() => setExpiryAction("delete")}
+                          className={`p-2 rounded-lg border text-left text-xs font-bold transition ${
+                            expiryAction === "delete"
+                              ? "border-rose-500 bg-rose-500/20 text-rose-600 dark:text-rose-400"
+                              : "border-black/10 dark:border-white/10 text-zinc-500"
                           }`}
                         >
-                          {p.label}
+                          🗑️ Auto-Delete Server
                         </button>
-                      ))}
+                        <button
+                          type="button"
+                          onClick={() => setExpiryAction("archive")}
+                          className={`p-2 rounded-lg border text-left text-xs font-bold transition ${
+                            expiryAction === "archive"
+                              ? "border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                              : "border-black/10 dark:border-white/10 text-zinc-500"
+                          }`}
+                        >
+                          🔒 Archive (Read-Only)
+                        </button>
+                      </div>
                     </div>
 
+                    {/* Presets */}
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 block">
+                        Select Lifespan Duration:
+                      </span>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[
+                          { label: "1 Min (Test)", days: 1 / 1440 },
+                          { label: "5 Mins", days: 5 / 1440 },
+                          { label: "1 Hour", days: 1 / 24 },
+                          { label: "1 Day", days: 1 },
+                          { label: "7 Days", days: 7 },
+                          { label: "30 Days", days: 30 }
+                        ].map((p) => (
+                          <button
+                            key={p.label}
+                            type="button"
+                            onClick={() => {
+                              setExpiryDays(p.days);
+                              setCustomTimestamp(Date.now() + p.days * 24 * 60 * 60 * 1000);
+                            }}
+                            className={`p-1.5 rounded-lg border text-xs font-semibold transition ${
+                              expiryDays === p.days
+                                ? "border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                                : "border-black/5 dark:border-white/10 hover:bg-black/5 text-zinc-600 dark:text-zinc-400"
+                            }`}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom Datetime Input */}
                     <div className="pt-1">
                       <span className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 block mb-1">
-                        Or Select Exact Custom Expiry Date & Time:
+                        Or Pick Exact Custom Expiry Date & Time:
                       </span>
                       <input
                         type="datetime-local"

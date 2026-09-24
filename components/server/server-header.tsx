@@ -7,6 +7,7 @@ import {
   LogOutIcon,
   PlusCircle,
   Settings,
+  Timer,
   Trash,
   UserPlus,
   Users
@@ -21,6 +22,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { useModal } from "@/hooks/use-modal-store";
+import { useServerTemporary } from "@/hooks/use-server-temporary";
 
 interface ServerHeaderProps {
   server: ServerWithMembersWithProfiles;
@@ -29,6 +31,7 @@ interface ServerHeaderProps {
 
 export function ServerHeader({ server, role }: ServerHeaderProps) {
   const { onOpen } = useModal();
+  const { isExpired, extendLifespan } = useServerTemporary(server.id);
   const [accentTheme, setAccentTheme] = React.useState("indigo");
   const [description, setDescription] = React.useState("");
   const [isTemporary, setIsTemporary] = React.useState(false);
@@ -135,7 +138,18 @@ export function ServerHeader({ server, role }: ServerHeaderProps) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56 text-xs font-medium rounded-xl p-1.5 shadow-2xl space-y-1 bg-white/95 dark:bg-[#1e1f22]/95 backdrop-blur-xl border border-black/10 dark:border-white/10">
-        {isModerator && (
+        {/* Always Available Extension Action */}
+        {(isTemporary || isExpired) && (
+          <DropdownMenuItem
+            onClick={() => extendLifespan(1)}
+            className="text-amber-600 dark:text-amber-400 px-3 py-2 text-xs font-bold cursor-pointer rounded-lg hover:bg-amber-500/10 transition"
+          >
+            Extend Lifespan (+1 Day)
+            <Timer className="h-4 w-4 ml-auto text-amber-500" />
+          </DropdownMenuItem>
+        )}
+
+        {!isExpired && isModerator && (
           <DropdownMenuItem
             onClick={() => onOpen("invite", { server })}
             className="text-indigo-600 dark:text-indigo-400 px-3 py-2 text-xs font-semibold cursor-pointer rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition"
@@ -153,7 +167,7 @@ export function ServerHeader({ server, role }: ServerHeaderProps) {
             <Settings className="h-4 w-4 ml-auto text-zinc-400" />
           </DropdownMenuItem>
         )}
-        {isAdmin && (
+        {!isExpired && isAdmin && (
           <DropdownMenuItem
             onClick={() => onOpen("members", { server })}
             className="px-3 py-2 text-xs cursor-pointer rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
@@ -162,7 +176,7 @@ export function ServerHeader({ server, role }: ServerHeaderProps) {
             <Users className="h-4 w-4 ml-auto text-zinc-400" />
           </DropdownMenuItem>
         )}
-        {isModerator && (
+        {!isExpired && isModerator && (
           <DropdownMenuItem
             onClick={() => onOpen("createChannel")}
             className="px-3 py-2 text-xs cursor-pointer rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition"
@@ -174,7 +188,7 @@ export function ServerHeader({ server, role }: ServerHeaderProps) {
         {isModerator && (
           <DropdownMenuSeparator className="bg-black/5 dark:bg-white/5 my-1" />
         )}
-        {isAdmin && (
+        {!isExpired && isAdmin && (
           <DropdownMenuItem
             onClick={() => onOpen("deleteServer", { server })}
             className="px-3 py-2 text-xs cursor-pointer text-rose-500 hover:bg-rose-500/10 rounded-lg transition"
@@ -196,3 +210,4 @@ export function ServerHeader({ server, role }: ServerHeaderProps) {
     </DropdownMenu>
   );
 }
+
