@@ -69,6 +69,15 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
 
   const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
+  const getLiveKitIdentity = useCallback((userId: string) => {
+    const randomPart =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    return `${userId}-${randomPart}`;
+  }, []);
+
   // 1. Fetch LiveKit Token if configured
   useEffect(() => {
     if (!user?.id || isExpired) return;
@@ -84,7 +93,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         setIsLiveKitLoading(true);
         const params = new URLSearchParams({
           room: chatId,
-          identity: user.id,
+          identity: getLiveKitIdentity(user.id),
           name:
             user.fullName ||
             user.username ||
@@ -108,7 +117,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         setIsLiveKitLoading(false);
       }
     })();
-  }, [user?.id, user?.fullName, user?.username, user?.primaryEmailAddress, chatId, livekitUrl, isExpired]);
+  }, [user?.id, user?.fullName, user?.username, user?.primaryEmailAddress, chatId, livekitUrl, isExpired, getLiveKitIdentity]);
 
   // 2. Initialize Microphone for Audio Meter Visualizer
   const initAudio = useCallback(async () => {
