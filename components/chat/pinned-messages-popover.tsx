@@ -43,18 +43,13 @@ export function PinnedMessagesPopover({
 }: PinnedMessagesPopoverProps) {
   const { socket } = useSocket();
   const { onOpen } = useModal();
-  let queryClient: any = null;
-  try {
-    queryClient = useQueryClient();
-  } catch {
-    // Graceful fallback
-  }
+  const queryClient = useQueryClient();
 
   const [isOpen, setIsOpen] = useState(false);
   const [pins, setPins] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchPins = async () => {
+  const fetchPins = React.useCallback(async () => {
     if (!chatId) return;
     try {
       setIsLoading(true);
@@ -69,11 +64,11 @@ export function PinnedMessagesPopover({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [chatId, type]);
 
   useEffect(() => {
     fetchPins();
-  }, [chatId, type]);
+  }, [fetchPins]);
 
   // Real-time socket listener for pin updates
   useEffect(() => {

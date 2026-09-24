@@ -8,7 +8,6 @@ import {
   Pin,
   Clock,
   Calendar,
-  Infinity as InfinityIcon,
   Sparkles,
   PinOff,
   Check
@@ -42,7 +41,7 @@ const durationPresets: {
     id: "permanent",
     label: "Permanent",
     sublabel: "Until manually unpinned",
-    icon: <InfinityIcon className="w-4 h-4 text-purple-400" />
+    icon: <Pin className="w-4 h-4 text-purple-400 fill-purple-400" />
   },
   {
     id: "1h",
@@ -78,12 +77,7 @@ const durationPresets: {
 
 export function PinMessageModal() {
   const { isOpen, onClose, type, data } = useModal();
-  let queryClient: any = null;
-  try {
-    queryClient = useQueryClient();
-  } catch {
-    // Graceful fallback if query context is unavailable
-  }
+  const queryClient = useQueryClient();
   const [selectedDuration, setSelectedDuration] = useState<DurationOption>("permanent");
   
   // Custom date default to 3 days from now in format YYYY-MM-DDTHH:mm
