@@ -11,7 +11,7 @@ import {
   useParticipants,
   useRoomContext,
 } from "@livekit/components-react";
-import { ConnectionState, Track } from "livekit-client";
+import { ConnectionState, Track, createLocalAudioTrack } from "livekit-client";
 import { useUser } from "@clerk/nextjs";
 import {
   Activity,
@@ -157,23 +157,35 @@ function LiveKitCallView({
   const publishMicrophone = useCallback(async () => {
     if (!localParticipant) return;
 
-    const publication =
-      (await localParticipant.setMicrophoneEnabled(true, {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      })) ?? localParticipant.getTrack(Track.Source.Microphone);
+    const audioOptions = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    };
 
-    if (!publication) {
-      throw new Error("Microphone track was not published.");
+    const existingPublication = localParticipant.getTrack(Track.Source.Microphone);
+    if (existingPublication?.track) {
+      await existingPublication.unmute();
+
+      if (existingPublication.isUpstreamPaused) {
+        await existingPublication.resumeUpstream();
+      }
+
+      if (!existingPublication.isMuted && existingPublication.isUpstreamPaused !== true) {
+        return;
+      }
+
+      await localParticipant.unpublishTrack(existingPublication.track, true);
     }
 
-    if (publication.isMuted) {
-      await publication.unmute();
-    }
+    const audioTrack = await createLocalAudioTrack(audioOptions);
+    const publication = await localParticipant.publishTrack(audioTrack, {
+      source: Track.Source.Microphone,
+      name: "microphone",
+    });
 
-    if (publication.isUpstreamPaused) {
-      await publication.resumeUpstream();
+    if (publication.isMuted || publication.isUpstreamPaused) {
+      throw new Error("Microphone track was published but is not sending audio.");
     }
   }, [localParticipant]);
 
