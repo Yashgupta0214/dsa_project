@@ -83,10 +83,25 @@ function CallParticipantTile({ participant, isLocal = false }: { participant: an
   );
 }
 
-function LiveKitCallView({ onHangup, userImageUrl }: { onHangup: () => void; userImageUrl?: string }) {
+function LiveKitCallView({
+  onHangup,
+  userImageUrl,
+  video,
+}: {
+  onHangup: () => void;
+  userImageUrl?: string;
+  video: boolean;
+}) {
   const participants = useParticipants();
-  const { localParticipant } = useLocalParticipant();
+  const {
+    localParticipant,
+    isMicrophoneEnabled,
+    isCameraEnabled,
+    isScreenShareEnabled,
+  } = useLocalParticipant();
   const room = useRoomContext();
+  const [isDeafened, setIsDeafened] = useState(false);
+  const [controlError, setControlError] = useState("");
 
   const visibleParticipants = useMemo(() => {
     const participantMap = new Map<string, { participant: any; isLocal: boolean }>();
@@ -117,8 +132,44 @@ function LiveKitCallView({ onHangup, userImageUrl }: { onHangup: () => void; use
     onHangup();
   }, [room, onHangup]);
 
+  const runParticipantAction = useCallback(async (action: () => Promise<unknown>, message: string) => {
+    try {
+      setControlError("");
+      await action();
+    } catch (error) {
+      console.error(message, error);
+      setControlError(message);
+    }
+  }, []);
+
+  const toggleMicrophone = useCallback(() => {
+    if (!localParticipant) return;
+    runParticipantAction(
+      () => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled),
+      "Microphone permission is blocked. Check your browser permissions and try again."
+    );
+  }, [localParticipant, isMicrophoneEnabled, runParticipantAction]);
+
+  const toggleCamera = useCallback(() => {
+    if (!localParticipant) return;
+    runParticipantAction(
+      () => localParticipant.setCameraEnabled(!isCameraEnabled),
+      "Camera permission is blocked. Check your browser permissions and try again."
+    );
+  }, [localParticipant, isCameraEnabled, runParticipantAction]);
+
+  const toggleScreenShare = useCallback(() => {
+    if (!localParticipant) return;
+    runParticipantAction(
+      () => localParticipant.setScreenShareEnabled(!isScreenShareEnabled),
+      "Screen sharing could not start. Check browser permissions and try again."
+    );
+  }, [localParticipant, isScreenShareEnabled, runParticipantAction]);
+
   return (
     <div className="flex h-full flex-1 flex-col bg-[#111214] text-white">
+      {!isDeafened && <RoomAudioRenderer />}
+
       <div className="flex-1 overflow-y-auto p-4">
         <div className="grid h-full gap-4 md:grid-cols-2">
           {visibleParticipants.map(({ participant, isLocal }) => (
@@ -127,13 +178,81 @@ function LiveKitCallView({ onHangup, userImageUrl }: { onHangup: () => void; use
         </div>
       </div>
 
+      {controlError && (
+        <div className="border-t border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-100">
+          {controlError}
+        </div>
+      )}
+
       <div className="flex h-20 items-center justify-between border-t border-white/10 bg-[#1e1f22]/95 px-4 shadow-2xl backdrop-blur-xl">
         <div className="flex items-center gap-3">
           <UserAvatar src={userImageUrl} className="h-9 w-9 ring-1 ring-white/10 shrink-0" />
           <div className="hidden sm:flex flex-col">
             <span className="text-xs font-bold text-white">Live call</span>
-            <span className="text-[11px] text-emerald-400">Connected</span>
+            <span className="text-[11px] text-emerald-400">
+              {isDeafened ? "Deafened" : isMicrophoneEnabled ? "Connected" : "Muted"}
+            </span>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <Button
+            type="button"
+            size="icon"
+            onClick={toggleMicrophone}
+            className={`h-11 w-11 rounded-2xl transition shadow-lg ${
+              isMicrophoneEnabled
+                ? "bg-zinc-700/80 hover:bg-zinc-600 text-white"
+                : "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20"
+            }`}
+            title={isMicrophoneEnabled ? "Mute Mic" : "Unmute Mic"}
+          >
+            {isMicrophoneEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+          </Button>
+
+          <Button
+            type="button"
+            size="icon"
+            onClick={() => setIsDeafened((current) => !current)}
+            className={`h-11 w-11 rounded-2xl transition shadow-lg ${
+              isDeafened
+                ? "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20"
+                : "bg-zinc-700/80 hover:bg-zinc-600 text-white"
+            }`}
+            title={isDeafened ? "Undeafen Audio" : "Deafen Audio"}
+          >
+            {isDeafened ? <VolumeX className="w-5 h-5" /> : <Headphones className="w-5 h-5" />}
+          </Button>
+
+          <Button
+            type="button"
+            size="icon"
+            onClick={toggleCamera}
+            className={`h-11 w-11 rounded-2xl transition shadow-lg ${
+              isCameraEnabled
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
+                : "bg-zinc-700/80 hover:bg-zinc-600 text-white"
+            }`}
+            title={isCameraEnabled ? "Turn Off Camera" : "Turn On Camera"}
+          >
+            {isCameraEnabled ? <Camera className="w-5 h-5" /> : <CameraOff className="w-5 h-5" />}
+          </Button>
+
+          {video && (
+            <Button
+              type="button"
+              size="icon"
+              onClick={toggleScreenShare}
+              className={`h-11 w-11 rounded-2xl transition shadow-lg ${
+                isScreenShareEnabled
+                  ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20"
+                  : "bg-zinc-700/80 hover:bg-zinc-600 text-white"
+              }`}
+              title={isScreenShareEnabled ? "Stop Sharing Screen" : "Share Screen"}
+            >
+              <Computer className="w-5 h-5" />
+            </Button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -484,10 +603,8 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
           setLiveKitError("LiveKit rejected the connection. Check that the URL, API key, and API secret all belong to the same LiveKit project.");
           setUseFallbackStudio(false);
         }}
-        onDisconnected={navigateAway}
       >
-        <RoomAudioRenderer />
-        <LiveKitCallView onHangup={navigateAway} userImageUrl={user?.imageUrl} />
+        <LiveKitCallView onHangup={navigateAway} userImageUrl={user?.imageUrl} video={video} />
       </LiveKitRoom>
     );
   }
