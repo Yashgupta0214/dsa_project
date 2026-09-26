@@ -1,10 +1,14 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import "@livekit/components-styles";
 import {
   LiveKitRoom,
-  VideoConference,
+  ParticipantTile,
+  RoomAudioRenderer,
+  useLocalParticipant,
+  useParticipants,
+  useRoomContext,
 } from "@livekit/components-react";
 import { useUser } from "@clerk/nextjs";
 import {
@@ -38,6 +42,116 @@ interface MediaRoomProps {
   serverId?: string;
 }
 
+function parseParticipantMetadata(metadata?: string | null) {
+  if (!metadata) return {} as { imageUrl?: string };
+
+  try {
+    return JSON.parse(metadata) as { imageUrl?: string };
+  } catch {
+    return {} as { imageUrl?: string };
+  }
+}
+
+function CallParticipantTile({ participant, isLocal = false }: { participant: any; isLocal?: boolean }) {
+  const metadata = useMemo(
+    () => parseParticipantMetadata(participant?.metadata),
+    [participant?.metadata]
+  );
+
+  const imageUrl = metadata.imageUrl || participant?.name || participant?.identity || undefined;
+  const displayName = participant?.name || participant?.identity || "Participant";
+  const hasVideo = Boolean(participant?.videoTrackPublications && participant.videoTrackPublications.size > 0);
+
+  return (
+    <div className="relative h-[260px] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#1e1f22] shadow-2xl">
+      {hasVideo ? (
+        <ParticipantTile participant={participant} className="h-full w-full" />
+      ) : (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#1e1f22] p-6 text-center">
+          <UserAvatar src={imageUrl} className="h-20 w-20 ring-2 ring-white/10 shadow-xl" />
+          <div>
+            <p className="text-sm font-bold text-white">{isLocal ? `${displayName} (You)` : displayName}</p>
+            <p className="text-[11px] text-zinc-400">{participant?.isMicrophoneEnabled === false ? "Muted" : "Listening..."}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="absolute bottom-3 left-3 rounded-lg border border-white/10 bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+        {isLocal ? `${displayName} (You)` : displayName}
+      </div>
+    </div>
+  );
+}
+
+function LiveKitCallView({ onHangup, userImageUrl }: { onHangup: () => void; userImageUrl?: string }) {
+  const participants = useParticipants();
+  const { localParticipant } = useLocalParticipant();
+  const room = useRoomContext();
+
+  const visibleParticipants = useMemo(() => {
+    const participantMap = new Map<string, { participant: any; isLocal: boolean }>();
+
+    participants.forEach((participant) => {
+      const key = participant.identity || participant.sid;
+      participantMap.set(key, {
+        participant,
+        isLocal: participant.identity === localParticipant?.identity,
+      });
+    });
+
+    if (localParticipant) {
+      const key = localParticipant.identity || localParticipant.sid;
+      participantMap.set(key, {
+        participant: localParticipant,
+        isLocal: true,
+      });
+    }
+
+    return Array.from(participantMap.values());
+  }, [participants, localParticipant]);
+
+  const handleHangup = useCallback(async () => {
+    if (room) {
+      await room.disconnect();
+    }
+    onHangup();
+  }, [room, onHangup]);
+
+  return (
+    <div className="flex h-full flex-1 flex-col bg-[#111214] text-white">
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="grid h-full gap-4 md:grid-cols-2">
+          {visibleParticipants.map(({ participant, isLocal }) => (
+            <CallParticipantTile key={participant.sid || participant.identity} participant={participant} isLocal={isLocal} />
+          ))}
+        </div>
+      </div>
+
+      <div className="flex h-20 items-center justify-between border-t border-white/10 bg-[#1e1f22]/95 px-4 shadow-2xl backdrop-blur-xl">
+        <div className="flex items-center gap-3">
+          <UserAvatar src={userImageUrl} className="h-9 w-9 ring-1 ring-white/10 shrink-0" />
+          <div className="hidden sm:flex flex-col">
+            <span className="text-xs font-bold text-white">Live call</span>
+            <span className="text-[11px] text-emerald-400">Connected</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleHangup}
+            className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-10 px-4 rounded-xl shadow-lg shadow-rose-600/20 flex items-center gap-2"
+          >
+            <PhoneOff className="w-4 h-4" />
+            <span className="hidden sm:inline">Leave</span>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   const { user } = useUser();
   const { isExpired, extendLifespan } = useServerTemporary(serverId);
@@ -62,12 +176,18 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   const [ping, setPing] = useState(24);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showConfigGuide, setShowConfigGuide] = useState(false);
+  const [mediaPermissionMessage, setMediaPermissionMessage] = useState("");
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const screenVideoRef = useRef<HTMLVideoElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
+
+  const navigateAway = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.location.href = serverId ? `/servers/${serverId}` : "/";
+  }, [serverId]);
 
   const getLiveKitIdentity = useCallback((userId: string) => {
     const randomPart =
@@ -94,6 +214,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
             user.username ||
             user.primaryEmailAddress?.emailAddress ||
             "User",
+          image: user.imageUrl || "",
         });
 
         const response = await fetch(`/api/livekit?${params.toString()}`, {
@@ -121,7 +242,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         setIsLiveKitLoading(false);
       }
     })();
-  }, [user?.id, user?.fullName, user?.username, user?.primaryEmailAddress, chatId, isExpired, getLiveKitIdentity]);
+  }, [user?.id, user?.fullName, user?.username, user?.primaryEmailAddress, user?.imageUrl, chatId, isExpired, getLiveKitIdentity]);
 
   // 2. Initialize Microphone for Audio Meter Visualizer
   const initAudio = useCallback(async () => {
@@ -156,6 +277,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       }
     } catch (e) {
       console.log("Audio permission or device not available on init:", e);
+      setMediaPermissionMessage("Microphone access is blocked. Please allow microphone permission for this site and refresh the page.");
     }
   }, []);
 
@@ -172,6 +294,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     } catch (e) {
       console.log("Webcam not available or permission denied on init:", e);
       setIsVideoOff(true);
+      setMediaPermissionMessage("Camera access is blocked. Please allow camera permission for this site and refresh the page.");
     }
   }, [video]);
 
@@ -361,8 +484,10 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
           setLiveKitError("LiveKit rejected the connection. Check that the URL, API key, and API secret all belong to the same LiveKit project.");
           setUseFallbackStudio(false);
         }}
+        onDisconnected={navigateAway}
       >
-        <VideoConference />
+        <RoomAudioRenderer />
+        <LiveKitCallView onHangup={navigateAway} userImageUrl={user?.imageUrl} />
       </LiveKitRoom>
     );
   }
@@ -412,6 +537,24 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
 
   return (
     <div className="flex flex-1 flex-col h-full bg-[#111214] text-white overflow-hidden select-none">
+      {mediaPermissionMessage && (
+        <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 backdrop-blur-sm">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+              <span>{mediaPermissionMessage}</span>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => window.location.reload()}
+              className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-[11px] h-8 px-3 rounded-lg"
+            >
+              Refresh
+            </Button>
+          </div>
+        </div>
+      )}
       {/* Top Header Bar */}
       <div className="h-12 px-4 bg-[#18191c]/80 border-b border-white/5 flex items-center justify-between shrink-0 backdrop-blur-md z-10">
         <div className="flex items-center gap-3">
@@ -667,11 +810,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
               if (audioStream) {
                 audioStream.getTracks().forEach((t) => t.stop());
               }
-              if (serverId) {
-                window.location.href = `/servers/${serverId}`;
-              } else {
-                window.location.href = "/";
-              }
+              navigateAway();
             }}
             className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-10 px-4 rounded-xl shadow-lg shadow-rose-600/20 flex items-center gap-2"
           >
