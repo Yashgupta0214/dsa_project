@@ -6,6 +6,8 @@ const isPublicRoute = (req: NextRequest) => {
 
   return (
     path === "/api/uploadthing" ||
+    path === "/api/livekit" ||
+    path.startsWith("/api/livekit") ||
     path.startsWith("/api/socket/webhooks") ||
     path.startsWith("/api/socket/io") ||
     path.startsWith("/api/upload") ||

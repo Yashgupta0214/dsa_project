@@ -6,10 +6,12 @@ import {
   LiveKitRoom,
   ParticipantTile,
   RoomAudioRenderer,
+  useConnectionState,
   useLocalParticipant,
   useParticipants,
   useRoomContext,
 } from "@livekit/components-react";
+import { ConnectionState, Track } from "livekit-client";
 import { useUser } from "@clerk/nextjs";
 import {
   Activity,
@@ -86,10 +88,12 @@ function CallParticipantTile({ participant, isLocal = false }: { participant: an
 function LiveKitCallView({
   onHangup,
   userImageUrl,
+  audio,
   video,
 }: {
   onHangup: () => void;
   userImageUrl?: string;
+  audio: boolean;
   video: boolean;
 }) {
   const participants = useParticipants();
@@ -100,8 +104,12 @@ function LiveKitCallView({
     isScreenShareEnabled,
   } = useLocalParticipant();
   const room = useRoomContext();
+  const connectionState = useConnectionState(room);
   const [isDeafened, setIsDeafened] = useState(false);
   const [controlError, setControlError] = useState("");
+  const requestedInitialMediaRef = useRef(false);
+  const localAudioPublication = localParticipant?.getTrack?.(Track.Source.Microphone);
+  const isPublishingMicrophone = Boolean(localAudioPublication && !localAudioPublication.isMuted);
 
   const visibleParticipants = useMemo(() => {
     const participantMap = new Map<string, { participant: any; isLocal: boolean }>();
@@ -141,6 +149,32 @@ function LiveKitCallView({
       setControlError(message);
     }
   }, []);
+
+  useEffect(() => {
+    if (
+      !localParticipant ||
+      connectionState !== ConnectionState.Connected ||
+      requestedInitialMediaRef.current
+    ) {
+      return;
+    }
+
+    requestedInitialMediaRef.current = true;
+
+    runParticipantAction(async () => {
+      if (audio) {
+        await localParticipant.setMicrophoneEnabled(true);
+      }
+
+      if (video) {
+        await localParticipant.setCameraEnabled(true);
+      }
+      const microphonePublication = localParticipant.getTrack(Track.Source.Microphone);
+      if (audio && (!microphonePublication || microphonePublication.isMuted)) {
+        throw new Error("Microphone track was not published.");
+      }
+    }, "Microphone or camera permission is blocked. Check browser permissions and try again.");
+  }, [localParticipant, connectionState, audio, video, runParticipantAction]);
 
   const toggleMicrophone = useCallback(() => {
     if (!localParticipant) return;
@@ -190,7 +224,7 @@ function LiveKitCallView({
           <div className="hidden sm:flex flex-col">
             <span className="text-xs font-bold text-white">Live call</span>
             <span className="text-[11px] text-emerald-400">
-              {isDeafened ? "Deafened" : isMicrophoneEnabled ? "Connected" : "Muted"}
+              {isDeafened ? "Deafened" : isPublishingMicrophone ? "Mic live" : isMicrophoneEnabled ? "Connecting mic" : "Muted"}
             </span>
           </div>
         </div>
@@ -604,7 +638,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
           setUseFallbackStudio(false);
         }}
       >
-        <LiveKitCallView onHangup={navigateAway} userImageUrl={user?.imageUrl} video={video} />
+        <LiveKitCallView onHangup={navigateAway} userImageUrl={user?.imageUrl} audio={audio} video={video} />
       </LiveKitRoom>
     );
   }
