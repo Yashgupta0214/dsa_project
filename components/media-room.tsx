@@ -109,7 +109,11 @@ function LiveKitCallView({
   const [controlError, setControlError] = useState("");
   const requestedInitialMediaRef = useRef(false);
   const localAudioPublication = localParticipant?.getTrack?.(Track.Source.Microphone);
-  const isPublishingMicrophone = Boolean(localAudioPublication && !localAudioPublication.isMuted);
+  const isPublishingMicrophone = Boolean(
+    localAudioPublication &&
+    !localAudioPublication.isMuted &&
+    localAudioPublication.isUpstreamPaused !== true
+  );
 
   const visibleParticipants = useMemo(() => {
     const participantMap = new Map<string, { participant: any; isLocal: boolean }>();
@@ -150,6 +154,29 @@ function LiveKitCallView({
     }
   }, []);
 
+  const publishMicrophone = useCallback(async () => {
+    if (!localParticipant) return;
+
+    const publication =
+      (await localParticipant.setMicrophoneEnabled(true, {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      })) ?? localParticipant.getTrack(Track.Source.Microphone);
+
+    if (!publication) {
+      throw new Error("Microphone track was not published.");
+    }
+
+    if (publication.isMuted) {
+      await publication.unmute();
+    }
+
+    if (publication.isUpstreamPaused) {
+      await publication.resumeUpstream();
+    }
+  }, [localParticipant]);
+
   useEffect(() => {
     if (
       !localParticipant ||
@@ -163,26 +190,22 @@ function LiveKitCallView({
 
     runParticipantAction(async () => {
       if (audio) {
-        await localParticipant.setMicrophoneEnabled(true);
+        await publishMicrophone();
       }
 
       if (video) {
         await localParticipant.setCameraEnabled(true);
       }
-      const microphonePublication = localParticipant.getTrack(Track.Source.Microphone);
-      if (audio && (!microphonePublication || microphonePublication.isMuted)) {
-        throw new Error("Microphone track was not published.");
-      }
     }, "Microphone or camera permission is blocked. Check browser permissions and try again.");
-  }, [localParticipant, connectionState, audio, video, runParticipantAction]);
+  }, [localParticipant, connectionState, audio, video, publishMicrophone, runParticipantAction]);
 
   const toggleMicrophone = useCallback(() => {
     if (!localParticipant) return;
     runParticipantAction(
-      () => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled),
+      () => isPublishingMicrophone ? localParticipant.setMicrophoneEnabled(false) : publishMicrophone(),
       "Microphone permission is blocked. Check your browser permissions and try again."
     );
-  }, [localParticipant, isMicrophoneEnabled, runParticipantAction]);
+  }, [localParticipant, isPublishingMicrophone, publishMicrophone, runParticipantAction]);
 
   const toggleCamera = useCallback(() => {
     if (!localParticipant) return;
@@ -235,13 +258,13 @@ function LiveKitCallView({
             size="icon"
             onClick={toggleMicrophone}
             className={`h-11 w-11 rounded-2xl transition shadow-lg ${
-              isMicrophoneEnabled
+              isPublishingMicrophone
                 ? "bg-zinc-700/80 hover:bg-zinc-600 text-white"
                 : "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20"
             }`}
-            title={isMicrophoneEnabled ? "Mute Mic" : "Unmute Mic"}
+            title={isPublishingMicrophone ? "Mute Mic" : "Unmute Mic"}
           >
-            {isMicrophoneEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+            {isPublishingMicrophone ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
           </Button>
 
           <Button
@@ -626,8 +649,8 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   if (!useFallbackStudio && token !== "" && liveKitServerUrl) {
     return (
       <LiveKitRoom
-        video={video}
-        audio={audio}
+        video={false}
+        audio={false}
         token={token}
         connect={true}
         serverUrl={liveKitServerUrl}
