@@ -251,7 +251,7 @@ export function EditProfileModal() {
 
       await axios.patch("/api/profile", {
         name: name.trim(),
-        imageUrl: imageUrl || undefined
+        imageUrl: imageUrl
       });
 
       localStorage.setItem("user_custom_status", customStatus.trim());

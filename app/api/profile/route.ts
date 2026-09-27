@@ -34,7 +34,7 @@ export async function PATCH(req: Request) {
       },
       data: {
         name: name.trim(),
-        ...(imageUrl !== undefined ? { imageUrl: imageUrl || profile.imageUrl } : {})
+        imageUrl: typeof imageUrl === "string" ? imageUrl : profile.imageUrl
       }
     });
 
