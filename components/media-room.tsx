@@ -57,6 +57,7 @@ interface PeerParticipant {
   };
   stream?: MediaStream;
   isSpeaking?: boolean;
+  connectionState?: RTCPeerConnectionState;
 }
 
 const rtcConfig: RTCConfiguration = {
@@ -169,6 +170,14 @@ function RemoteParticipantTile({
   }, [participant.stream]);
 
   const isSpeaking = audioLevel > 5 && !participant.mediaState.isMuted;
+  const isConnecting = !participant.stream || participant.connectionState === "connecting";
+  const statusLabel = participant.mediaState.isMuted
+    ? "Muted"
+    : isSpeaking
+    ? "Speaking..."
+    : isConnecting
+    ? "Connecting..."
+    : "Connected";
 
   return (
     <div
@@ -207,11 +216,7 @@ function RemoteParticipantTile({
           <div>
             <p className="text-sm font-bold text-white">{participant.user.name}</p>
             <p className="text-[11px] text-zinc-400">
-              {participant.mediaState.isMuted
-                ? "Muted"
-                : isSpeaking
-                ? "Speaking..."
-                : "Connected"}
+              {statusLabel}
             </p>
           </div>
         </div>
@@ -578,12 +583,23 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
 
     // 4. Handle Negotiation / Disconnection
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "disconnected" || pc.connectionState === "failed" || pc.connectionState === "closed") {
-        setRemoteParticipants((prev) => {
-          const next = new Map(prev);
-          next.delete(targetSocketId);
-          return next;
+      setRemoteParticipants((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(targetSocketId) || {
+          socketId: targetSocketId,
+          user: participantUser,
+          mediaState: participantMedia,
+        };
+
+        next.set(targetSocketId, {
+          ...existing,
+          connectionState: pc.connectionState,
         });
+
+        return next;
+      });
+
+      if (pc.connectionState === "closed") {
         peerConnectionsRef.current.delete(targetSocketId);
       }
     };
@@ -607,7 +623,9 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       participants.forEach((p) => {
         setRemoteParticipants((prev) => {
           const next = new Map(prev);
+          const existing = next.get(p.socketId);
           next.set(p.socketId, {
+            ...existing,
             socketId: p.socketId,
             user: p.user,
             mediaState: p.mediaState,
@@ -624,7 +642,9 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     const handleUserJoined = (data: { socketId: string; user: any; mediaState: any }) => {
       setRemoteParticipants((prev) => {
         const next = new Map(prev);
+        const existing = next.get(data.socketId);
         next.set(data.socketId, {
+          ...existing,
           socketId: data.socketId,
           user: data.user,
           mediaState: data.mediaState,
@@ -632,9 +652,6 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         return next;
       });
 
-      if (!peerConnectionsRef.current.has(data.socketId)) {
-        createPeerConnection(data.socketId, data.user, data.mediaState, false);
-      }
     };
 
     // 3. Handle WebRTC signals (Offers, Answers, ICE Candidates)
