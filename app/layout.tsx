@@ -12,9 +12,9 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 
 export const metadata: Metadata = {
-  title: "Discord — Your Place to Talk and Hang Out",
+  title: "Komit",
   description:
-    "Next-generation Discord community platform with real-time text channels, voice & video rooms, and encrypted direct messages."
+    "Next-generation Komit community platform with real-time text channels, voice & video rooms, and encrypted direct messages."
 };
 
 export default function RootLayout({

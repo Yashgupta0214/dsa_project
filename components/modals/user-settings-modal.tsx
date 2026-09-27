@@ -66,7 +66,7 @@ export function UserSettingsModal() {
         perm = await requestPermission();
       }
       if (perm === "granted") {
-        new Notification("🔔 Discord Notification Test", {
+        new Notification("🔔 Komit Notification Test", {
           body: "Device notifications are working smoothly! You will get notified on all incoming texts.",
           icon: profile.imageUrl || "/favicon.ico"
         });
@@ -215,7 +215,7 @@ export function UserSettingsModal() {
             <div className="space-y-6">
               <div>
                 <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Appearance</h3>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Customize how your Discord experience looks</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">Customize how your Komit experience looks</p>
               </div>
 
               <div className="space-y-3">
