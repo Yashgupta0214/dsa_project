@@ -411,21 +411,26 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         const data = await response.json();
 
         if (!response.ok || !data.token || !data.wsUrl) {
-          setUseFallbackStudio(false);
+          setToken("");
+          setLiveKitServerUrl("");
+          setUseFallbackStudio(true);
           setLiveKitError(
             data?.error ||
-              "LiveKit could not create a voice connection. Check the server LiveKit URL, API key, and secret."
+              "LiveKit could not create a voice connection. Falling back to the local Discord-style preview."
           );
-        } else {
-          setToken(data.token);
-          setLiveKitServerUrl(data.wsUrl);
-          setUseFallbackStudio(false);
-          setLiveKitError("");
+          return;
         }
+
+        setToken(data.token);
+        setLiveKitServerUrl(data.wsUrl);
+        setUseFallbackStudio(false);
+        setLiveKitError("");
       } catch (err) {
         console.warn("LiveKit token request failed:", err);
-        setUseFallbackStudio(false);
-        setLiveKitError("LiveKit is not reachable from this app right now.");
+        setToken("");
+        setLiveKitServerUrl("");
+        setUseFallbackStudio(true);
+        setLiveKitError("LiveKit is not reachable from this app right now. Using the local preview instead.");
       } finally {
         setIsLiveKitLoading(false);
       }
@@ -567,6 +572,11 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
 
   // Toggle Camera
   const toggleVideo = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMediaPermissionMessage("This browser does not support webcam access. Please use a modern browser with camera permissions enabled.");
+      return;
+    }
+
     if (isVideoOff || !cameraStream) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -575,9 +585,10 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         });
         setCameraStream(stream);
         setIsVideoOff(false);
+        setMediaPermissionMessage("");
       } catch (err) {
         console.error("Camera access failed:", err);
-        alert("Camera could not be opened. Please verify that webcam permissions are allowed in your browser settings.");
+        setMediaPermissionMessage("Camera could not be opened. Please verify webcam permissions are allowed for this site and try again.");
       }
     } else {
       cameraStream.getTracks().forEach((t) => t.stop());
@@ -670,7 +681,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         onError={(error) => {
           console.error("LiveKit room error:", error);
           setLiveKitError("LiveKit rejected the connection. Check that the URL, API key, and API secret all belong to the same LiveKit project.");
-          setUseFallbackStudio(false);
+          setUseFallbackStudio(true);
         }}
       >
         <LiveKitCallView onHangup={navigateAway} userImageUrl={user?.imageUrl} audio={audio} video={video} />
@@ -688,7 +699,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     );
   }
 
-  if (liveKitError) {
+  if (liveKitError && !useFallbackStudio) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center bg-[#111214] p-6 text-center">
         <div className="w-full max-w-lg rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-6 shadow-2xl backdrop-blur-md">
@@ -814,99 +825,100 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       )}
 
       {/* Main Video & Audio Stage Grid */}
-      <div className="flex-1 p-4 grid grid-cols-1 md:grid-cols-2 gap-4 items-center justify-center overflow-y-auto">
-        {/* Screen Share Tile (if active) */}
-        {isScreenSharing && (
-          <div className="relative w-full h-[280px] md:h-full max-h-[460px] rounded-2xl bg-[#1e1f22] border border-indigo-500/40 overflow-hidden shadow-2xl flex flex-col items-center justify-center group animate-in fade-in duration-200">
-            <video
-              ref={setScreenVideoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-contain bg-black"
-            />
-            <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-[11px] font-bold text-white flex items-center gap-1.5 border border-white/10 shadow-md">
-              <Computer className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-              <span>{userName}&apos;s Screen</span>
-            </div>
-          </div>
-        )}
+      <div className="flex-1 p-4">
+        <div className="mx-auto flex h-full max-w-6xl flex-col gap-4">
+          <div className="grid flex-1 gap-4 md:grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.9fr)]">
+            {/* Screen Share Tile (if active) */}
+            {isScreenSharing && (
+              <div className="relative w-full h-[280px] md:h-[420px] rounded-[26px] bg-[#1e1f22] border border-indigo-500/40 overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.55)] flex flex-col items-center justify-center group animate-in fade-in duration-200">
+                <video
+                  ref={setScreenVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-contain bg-[#0b0d11]"
+                />
+                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-[11px] font-bold text-white flex items-center gap-1.5 border border-white/10 shadow-md">
+                  <Computer className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                  <span>{userName}&apos;s Screen</span>
+                </div>
+              </div>
+            )}
 
-        {/* Primary User Tile (Voice / Camera) */}
-        <div
-          className={`relative w-full h-full min-h-[260px] max-h-[460px] rounded-2xl bg-[#1e1f22] border ${
-            isSpeaking ? "border-emerald-500 shadow-emerald-500/20 ring-2 ring-emerald-500/30" : "border-white/10"
-          } transition-all duration-150 overflow-hidden shadow-2xl flex flex-col items-center justify-center group`}
-        >
-          {/* Active Camera Video Stream */}
-          {!isVideoOff && cameraStream ? (
-            <video
-              ref={setCameraVideoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover scale-x-[-1] bg-black"
-            />
-          ) : (
-            /* Voice Avatar Tile with Speaking Glow */
-            <div className="flex flex-col items-center justify-center p-6 space-y-4">
-              <div className="relative">
-                <div
-                  className={`absolute -inset-2 rounded-full transition-all duration-75 ${
-                    isSpeaking
-                      ? "bg-emerald-500/30 scale-110 blur-sm ring-4 ring-emerald-500"
-                      : "bg-transparent scale-100"
-                  }`}
+            {/* Primary User Tile (Voice / Camera) */}
+            <div
+              className={`relative w-full h-full min-h-[260px] md:min-h-[420px] rounded-[26px] bg-[radial-gradient(circle_at_top,_rgba(88,101,242,0.18),_rgba(17,18,20,0.96)_45%)] border ${
+                isSpeaking ? "border-emerald-500 shadow-[0_0_0_1px_rgba(16,185,129,0.35),0_24px_60px_rgba(16,185,129,0.15)]" : "border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.45)]"
+              } transition-all duration-150 overflow-hidden flex flex-col items-center justify-center group backdrop-blur-sm`}
+            >
+              {/* Active Camera Video Stream */}
+              {!isVideoOff && cameraStream ? (
+                <video
+                  ref={setCameraVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="h-full w-full object-cover scale-x-[-1] bg-[#0b0d11]"
                 />
-                <UserAvatar
-                  src={user?.imageUrl}
-                  className="h-24 w-24 md:h-32 md:w-32 ring-2 ring-white/10 shadow-2xl relative z-10"
-                />
-                {/* Audio Wave Visualizer Indicator */}
-                {isSpeaking && (
-                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold shadow-md z-20">
-                    <Activity className="w-3 h-3 animate-pulse" /> Speaking
+              ) : (
+                /* Voice Avatar Tile with Speaking Glow */
+                <div className="flex flex-col items-center justify-center p-6 space-y-4">
+                  <div className="relative">
+                    <div
+                      className={`absolute -inset-2 rounded-full transition-all duration-75 ${
+                        isSpeaking
+                          ? "bg-emerald-500/30 scale-110 blur-sm ring-4 ring-emerald-500/70"
+                          : "bg-transparent scale-100"
+                      }`}
+                    />
+                    <UserAvatar
+                      src={user?.imageUrl}
+                      className="h-24 w-24 md:h-32 md:w-32 ring-2 ring-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.4)] relative z-10"
+                    />
+                    {isSpeaking && (
+                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold shadow-md z-20">
+                        <Activity className="w-3 h-3 animate-pulse" /> Speaking
+                      </div>
+                    )}
                   </div>
+
+                  <div className="text-center">
+                    <h4 className="text-base font-bold text-white flex items-center justify-center gap-1.5">
+                      {userName}
+                      {isMuted && <MicOff className="w-4 h-4 text-rose-500 ml-1" />}
+                    </h4>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      {isSpeaking ? "🟢 Broadcasting Voice" : isMuted ? "🔴 Microphone Muted" : "Listening..."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-xs font-semibold text-white flex items-center gap-2 border border-white/10">
+                <span>{userName} (You)</span>
+                {isMuted ? (
+                  <span className="p-0.5 rounded bg-rose-500/20 text-rose-400">
+                    <MicOff className="w-3 h-3" />
+                  </span>
+                ) : (
+                  <span className="p-0.5 rounded bg-emerald-500/20 text-emerald-400">
+                    <Mic className="w-3 h-3" />
+                  </span>
                 )}
               </div>
 
-              <div className="text-center">
-                <h4 className="text-base font-bold text-white flex items-center justify-center gap-1.5">
-                  {userName}
-                  {isMuted && <MicOff className="w-4 h-4 text-rose-500 ml-1" />}
-                </h4>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  {isSpeaking ? "🟢 Broadcasting Voice" : isMuted ? "🔴 Microphone Muted" : "Listening..."}
-                </p>
+              <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                <span className="px-2 py-0.5 rounded-md bg-black/50 text-[10px] font-mono text-zinc-300 border border-white/5">
+                  1080p 60fps
+                </span>
               </div>
             </div>
-          )}
-
-          {/* User Tile Overlay Badges */}
-          <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-xs font-semibold text-white flex items-center gap-2 border border-white/10">
-            <span>{userName} (You)</span>
-            {isMuted ? (
-              <span className="p-0.5 rounded bg-rose-500/20 text-rose-400">
-                <MicOff className="w-3 h-3" />
-              </span>
-            ) : (
-              <span className="p-0.5 rounded bg-emerald-500/20 text-emerald-400">
-                <Mic className="w-3 h-3" />
-              </span>
-            )}
-          </div>
-
-          <div className="absolute top-3 right-3 flex items-center gap-1.5">
-            <span className="px-2 py-0.5 rounded-md bg-black/50 text-[10px] font-mono text-zinc-300 border border-white/5">
-              1080p 60fps
-            </span>
           </div>
         </div>
       </div>
 
       {/* Discord-Style Bottom Control Dock */}
-      <div className="h-20 bg-[#1e1f22]/95 border-t border-white/10 px-4 flex items-center justify-between shrink-0 shadow-2xl backdrop-blur-xl">
-        {/* Left Status */}
+      <div className="h-20 bg-[#1e1f22]/95 border-t border-white/10 px-4 flex items-center justify-between shrink-0 shadow-[0_-12px_28px_rgba(0,0,0,0.25)] backdrop-blur-xl">
         <div className="flex items-center gap-3 min-w-0">
           <UserAvatar src={user?.imageUrl} className="h-9 w-9 ring-1 ring-white/10 shrink-0" />
           <div className="hidden sm:flex flex-col truncate">
@@ -918,9 +930,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
           </div>
         </div>
 
-        {/* Center Control Buttons */}
         <div className="flex items-center gap-2.5">
-          {/* Mute Toggle */}
           <Button
             type="button"
             size="icon"
@@ -935,7 +945,6 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
             {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </Button>
 
-          {/* Deafen Toggle */}
           <Button
             type="button"
             size="icon"
@@ -950,7 +959,6 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
             {isDeafened ? <VolumeX className="w-5 h-5" /> : <Headphones className="w-5 h-5" />}
           </Button>
 
-          {/* Camera Toggle */}
           <Button
             type="button"
             size="icon"
@@ -965,7 +973,6 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
             {!isVideoOff && cameraStream ? <Camera className="w-5 h-5" /> : <CameraOff className="w-5 h-5" />}
           </Button>
 
-          {/* Screen Share Toggle */}
           <Button
             type="button"
             size="icon"
@@ -981,7 +988,6 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
           </Button>
         </div>
 
-        {/* Right Action: Disconnect */}
         <div className="flex items-center gap-2">
           <Button
             type="button"
