@@ -102,8 +102,96 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
         socket.emit("presence:sync", buildPresenceDictionary());
       });
 
+      // =====================================================================
+      // WebRTC Multi-Peer Voice & Video Calling Signaling
+      // =====================================================================
+      socket.on("call:join_room", (data: { roomId: string; user: { id: string; name: string; imageUrl?: string }; mediaState: { isMuted: boolean; isVideoOff: boolean; isScreenSharing: boolean } }) => {
+        const { roomId, user, mediaState } = data || {};
+        if (!roomId || !user?.id) return;
+
+        socket.join(roomId);
+        (socket as any).currentCallRoom = roomId;
+        (socket as any).callUser = user;
+        (socket as any).mediaState = mediaState;
+
+        // Get other participants in the room
+        const roomSockets = io.sockets.adapter.rooms.get(roomId);
+        const participants: Array<{ socketId: string; user: any; mediaState: any }> = [];
+
+        if (roomSockets) {
+          roomSockets.forEach((sId) => {
+            if (sId !== socket.id) {
+              const targetSocket = io.sockets.sockets.get(sId);
+              if (targetSocket) {
+                participants.push({
+                  socketId: sId,
+                  user: (targetSocket as any).callUser || { id: sId, name: "User" },
+                  mediaState: (targetSocket as any).mediaState || { isMuted: false, isVideoOff: true, isScreenSharing: false }
+                });
+              }
+            }
+          });
+        }
+
+        // Send existing participants to the joined user
+        socket.emit("call:all_participants", participants);
+
+        // Notify other participants that a new user joined
+        socket.to(roomId).emit("call:user_joined", {
+          socketId: socket.id,
+          user,
+          mediaState
+        });
+      });
+
+      // Forward WebRTC signals (Offers, Answers, ICE Candidates)
+      socket.on("call:signal", (data: { to: string; signal: any }) => {
+        const { to, signal } = data || {};
+        if (!to || !signal) return;
+
+        io.to(to).emit("call:signal", {
+          from: socket.id,
+          signal,
+          user: (socket as any).callUser,
+          mediaState: (socket as any).mediaState
+        });
+      });
+
+      // Broadcast media state changes (Mute, Camera, Screen Share)
+      socket.on("call:media_state", (data: { roomId: string; mediaState: { isMuted: boolean; isVideoOff: boolean; isScreenSharing: boolean } }) => {
+        const { roomId, mediaState } = data || {};
+        if (!roomId || !mediaState) return;
+
+        (socket as any).mediaState = mediaState;
+        socket.to(roomId).emit("call:user_media_state", {
+          socketId: socket.id,
+          mediaState
+        });
+      });
+
+      // Explicitly leave call room
+      socket.on("call:leave_room", (data: { roomId?: string }) => {
+        const roomId = data?.roomId || (socket as any).currentCallRoom;
+        if (roomId) {
+          socket.leave(roomId);
+          socket.to(roomId).emit("call:user_left", {
+            socketId: socket.id,
+            user: (socket as any).callUser
+          });
+          (socket as any).currentCallRoom = null;
+        }
+      });
+
       // 5. Handle disconnection
       socket.on("disconnect", () => {
+        const callRoom = (socket as any).currentCallRoom;
+        if (callRoom) {
+          socket.to(callRoom).emit("call:user_left", {
+            socketId: socket.id,
+            user: (socket as any).callUser
+          });
+        }
+
         const mapping = socketToUser.get(socket.id);
         if (mapping) {
           socketToUser.delete(socket.id);

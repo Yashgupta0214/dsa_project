@@ -2,16 +2,6 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import "@livekit/components-styles";
-import {
-  LiveKitRoom,
-  ParticipantTile,
-  RoomAudioRenderer,
-  useConnectionState,
-  useLocalParticipant,
-  useParticipants,
-  useRoomContext,
-} from "@livekit/components-react";
-import { ConnectionState, Track, createLocalAudioTrack } from "livekit-client";
 import { useUser } from "@clerk/nextjs";
 import {
   Camera,
@@ -34,7 +24,6 @@ import {
   ShieldCheck,
   Sparkles,
   Timer,
-  UserCheck,
   UserPlus,
   Volume2,
   VolumeX,
@@ -42,6 +31,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user-avatar";
 import { useServerTemporary } from "@/hooks/use-server-temporary";
+import { useSocket } from "@/components/providers/socket-provider";
 
 interface MediaRoomProps {
   chatId: string;
@@ -49,6 +39,32 @@ interface MediaRoomProps {
   audio: boolean;
   serverId?: string;
 }
+
+interface PeerParticipant {
+  socketId: string;
+  user: {
+    id: string;
+    name: string;
+    imageUrl?: string;
+  };
+  mediaState: {
+    isMuted: boolean;
+    isVideoOff: boolean;
+    isScreenSharing: boolean;
+  };
+  stream?: MediaStream;
+  isSpeaking?: boolean;
+}
+
+const rtcConfig: RTCConfiguration = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
+    { urls: "stun:stun4.l.google.com:19302" },
+  ],
+};
 
 const cameraConstraints: MediaStreamConstraints = {
   video: {
@@ -77,40 +93,107 @@ function getCameraErrorMessage(error: unknown) {
   return "Camera could not be opened. Check webcam permissions and try again.";
 }
 
-function parseParticipantMetadata(metadata?: string | null) {
-  if (!metadata) return {} as { imageUrl?: string };
-  try {
-    return JSON.parse(metadata) as { imageUrl?: string };
-  } catch {
-    return {} as { imageUrl?: string };
-  }
-}
+// Remote Participant Video & Audio Tile Component
+function RemoteParticipantTile({
+  participant,
+  isDeafened,
+}: {
+  participant: PeerParticipant;
+  isDeafened: boolean;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioLevel, setAudioLevel] = useState(0);
 
-function CallParticipantTile({ participant, isLocal = false }: { participant: any; isLocal?: boolean }) {
-  const metadata = useMemo(
-    () => parseParticipantMetadata(participant?.metadata),
-    [participant?.metadata]
+  const hasVideoStream = Boolean(
+    participant.stream &&
+    participant.stream.getVideoTracks().length > 0 &&
+    participant.stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live") &&
+    !participant.mediaState.isVideoOff
   );
 
-  const imageUrl = metadata.imageUrl || participant?.name || participant?.identity || undefined;
-  const displayName = participant?.name || participant?.identity || "Participant";
-  const hasVideo = Boolean(participant?.videoTrackPublications && participant.videoTrackPublications.size > 0);
-  const isSpeaking = participant?.isSpeaking;
+  useEffect(() => {
+    if (videoRef.current && participant.stream) {
+      videoRef.current.srcObject = participant.stream;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [participant.stream, hasVideoStream]);
+
+  useEffect(() => {
+    if (audioRef.current && participant.stream) {
+      audioRef.current.srcObject = participant.stream;
+      audioRef.current.muted = isDeafened;
+      audioRef.current.play().catch((err) => console.log("Remote audio autoplay notice:", err));
+    }
+  }, [participant.stream, isDeafened]);
+
+  // Audio visualizer for remote participant
+  useEffect(() => {
+    if (!participant.stream) return;
+    const audioTracks = participant.stream.getAudioTracks();
+    if (!audioTracks.length) return;
+
+    let animId: number;
+    let audioCtx: AudioContext | null = null;
+
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtx = new AudioContextClass();
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        const source = audioCtx.createMediaStreamSource(participant.stream);
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const check = () => {
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+          setAudioLevel(sum / dataArray.length);
+          animId = requestAnimationFrame(check);
+        };
+        check();
+      }
+    } catch (e) {
+      console.log("Remote audio analyser error:", e);
+    }
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId);
+      if (audioCtx) audioCtx.close().catch(() => {});
+    };
+  }, [participant.stream]);
+
+  const isSpeaking = audioLevel > 5 && !participant.mediaState.isMuted;
 
   return (
     <div
-      className={`relative h-[260px] w-full overflow-hidden rounded-2xl border bg-[#1e1f22] shadow-2xl transition-all duration-200 ${
+      className={`relative flex min-h-[260px] h-full w-full items-center justify-center overflow-hidden rounded-2xl border transition-all duration-200 ${
         isSpeaking
-          ? "border-emerald-500 shadow-emerald-500/20 ring-2 ring-emerald-500/50"
-          : "border-white/10"
+          ? "border-emerald-500 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-500/40"
+          : "border-white/10 bg-[#1e1f22]"
       }`}
     >
-      {hasVideo ? (
-        <ParticipantTile participant={participant} className="h-full w-full" />
+      {/* Hidden Remote Audio Element (Always Plays Incoming Audio) */}
+      <audio ref={audioRef} autoPlay playsInline />
+
+      {/* Video stream or Avatar */}
+      {hasVideoStream ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          className="h-full w-full object-cover bg-black"
+        />
       ) : (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#1e1f22] p-6 text-center">
+        <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center">
           <div className="relative">
-            <UserAvatar src={imageUrl} name={displayName} className="h-20 w-20 ring-2 ring-white/10 shadow-xl" />
+            <UserAvatar
+              src={participant.user.imageUrl}
+              name={participant.user.name}
+              className="h-20 w-20 ring-4 ring-white/10 shadow-2xl"
+            />
             {isSpeaking && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -119,276 +202,26 @@ function CallParticipantTile({ participant, isLocal = false }: { participant: an
             )}
           </div>
           <div>
-            <p className="text-sm font-bold text-white">{isLocal ? `${displayName} (You)` : displayName}</p>
+            <p className="text-sm font-bold text-white">{participant.user.name}</p>
             <p className="text-[11px] text-zinc-400">
-              {participant?.isMicrophoneEnabled === false ? "Muted" : isSpeaking ? "Speaking..." : "Listening..."}
+              {participant.mediaState.isMuted
+                ? "Muted"
+                : isSpeaking
+                ? "Speaking..."
+                : "Connected"}
             </p>
           </div>
         </div>
       )}
 
-      <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
-        {participant?.isMicrophoneEnabled === false ? (
-          <MicOff className="h-3 w-3 text-rose-400" />
+      {/* Bottom Info Label */}
+      <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+        {participant.mediaState.isMuted ? (
+          <MicOff className="h-3.5 w-3.5 text-rose-400" />
         ) : (
-          <Mic className="h-3 w-3 text-emerald-400" />
+          <Mic className="h-3.5 w-3.5 text-emerald-400" />
         )}
-        <span>{isLocal ? `${displayName} (You)` : displayName}</span>
-      </div>
-    </div>
-  );
-}
-
-function LiveKitCallView({
-  onHangup,
-  userImageUrl,
-  audio,
-  video,
-}: {
-  onHangup: () => void;
-  userImageUrl?: string;
-  audio: boolean;
-  video: boolean;
-}) {
-  const participants = useParticipants();
-  const {
-    localParticipant,
-    isMicrophoneEnabled,
-    isCameraEnabled,
-    isScreenShareEnabled,
-  } = useLocalParticipant();
-  const room = useRoomContext();
-  const connectionState = useConnectionState(room);
-  const [isDeafened, setIsDeafened] = useState(false);
-  const [controlError, setControlError] = useState("");
-  const requestedInitialMediaRef = useRef(false);
-  const localAudioPublication = localParticipant?.getTrack?.(Track.Source.Microphone);
-  const isPublishingMicrophone = Boolean(
-    localAudioPublication &&
-    !localAudioPublication.isMuted &&
-    localAudioPublication.isUpstreamPaused !== true
-  );
-
-  const visibleParticipants = useMemo(() => {
-    const participantMap = new Map<string, { participant: any; isLocal: boolean }>();
-
-    participants.forEach((participant) => {
-      const key = participant.identity || participant.sid;
-      participantMap.set(key, {
-        participant,
-        isLocal: participant.identity === localParticipant?.identity,
-      });
-    });
-
-    if (localParticipant) {
-      const key = localParticipant.identity || localParticipant.sid;
-      participantMap.set(key, {
-        participant: localParticipant,
-        isLocal: true,
-      });
-    }
-
-    return Array.from(participantMap.values());
-  }, [participants, localParticipant]);
-
-  const handleHangup = useCallback(async () => {
-    if (room) {
-      await room.disconnect();
-    }
-    onHangup();
-  }, [room, onHangup]);
-
-  const runParticipantAction = useCallback(async (action: () => Promise<unknown>, message: string) => {
-    try {
-      setControlError("");
-      await action();
-    } catch (error) {
-      console.error(message, error);
-      setControlError(message);
-    }
-  }, []);
-
-  const publishMicrophone = useCallback(async () => {
-    if (!localParticipant) return;
-
-    const audioOptions = {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    };
-
-    const existingPublication = localParticipant.getTrack(Track.Source.Microphone);
-    if (existingPublication?.track) {
-      await existingPublication.unmute();
-
-      if (existingPublication.isUpstreamPaused) {
-        await existingPublication.resumeUpstream();
-      }
-
-      if (!existingPublication.isMuted && existingPublication.isUpstreamPaused !== true) {
-        return;
-      }
-
-      await localParticipant.unpublishTrack(existingPublication.track, true);
-    }
-
-    const audioTrack = await createLocalAudioTrack(audioOptions);
-    const publication = await localParticipant.publishTrack(audioTrack, {
-      source: Track.Source.Microphone,
-      name: "microphone",
-    });
-
-    if (publication.isMuted || publication.isUpstreamPaused) {
-      throw new Error("Microphone track was published but is not sending audio.");
-    }
-  }, [localParticipant]);
-
-  useEffect(() => {
-    if (
-      !localParticipant ||
-      connectionState !== ConnectionState.Connected ||
-      requestedInitialMediaRef.current
-    ) {
-      return;
-    }
-
-    requestedInitialMediaRef.current = true;
-
-    runParticipantAction(async () => {
-      if (audio) {
-        await publishMicrophone();
-      }
-
-      if (video) {
-        await localParticipant.setCameraEnabled(true);
-      }
-    }, "Microphone or camera permission is blocked. Check browser permissions and try again.");
-  }, [localParticipant, connectionState, audio, video, publishMicrophone, runParticipantAction]);
-
-  const toggleMicrophone = useCallback(() => {
-    if (!localParticipant) return;
-    runParticipantAction(
-      () => isPublishingMicrophone ? localParticipant.setMicrophoneEnabled(false) : publishMicrophone(),
-      "Microphone permission is blocked. Check your browser permissions and try again."
-    );
-  }, [localParticipant, isPublishingMicrophone, publishMicrophone, runParticipantAction]);
-
-  const toggleCamera = useCallback(() => {
-    if (!localParticipant) return;
-    runParticipantAction(
-      () => localParticipant.setCameraEnabled(!isCameraEnabled),
-      "Camera permission is blocked. Check your browser permissions and try again."
-    );
-  }, [localParticipant, isCameraEnabled, runParticipantAction]);
-
-  const toggleScreenShare = useCallback(() => {
-    if (!localParticipant) return;
-    runParticipantAction(
-      () => localParticipant.setScreenShareEnabled(!isScreenShareEnabled),
-      "Screen sharing could not start. Check browser permissions and try again."
-    );
-  }, [localParticipant, isScreenShareEnabled, runParticipantAction]);
-
-  return (
-    <div className="flex h-full flex-1 flex-col bg-[#111214] text-white">
-      {!isDeafened && <RoomAudioRenderer />}
-
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="grid h-full gap-4 md:grid-cols-2">
-          {visibleParticipants.map(({ participant, isLocal }) => (
-            <CallParticipantTile key={participant.sid || participant.identity} participant={participant} isLocal={isLocal} />
-          ))}
-        </div>
-      </div>
-
-      {controlError && (
-        <div className="border-t border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-100">
-          {controlError}
-        </div>
-      )}
-
-      <div className="flex h-20 items-center justify-between border-t border-white/10 bg-[#1e1f22]/95 px-4 shadow-2xl backdrop-blur-xl">
-        <div className="flex items-center gap-3">
-          <UserAvatar src={userImageUrl} className="h-9 w-9 ring-1 ring-white/10 shrink-0" />
-          <div className="hidden sm:flex flex-col">
-            <span className="text-xs font-bold text-white">Live Call</span>
-            <span className="text-[11px] text-emerald-400">
-              {isDeafened ? "Deafened" : isPublishingMicrophone ? "Mic live" : isMicrophoneEnabled ? "Connecting mic" : "Muted"}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <Button
-            type="button"
-            size="icon"
-            onClick={toggleMicrophone}
-            className={`h-11 w-11 rounded-2xl transition shadow-lg ${
-              isPublishingMicrophone
-                ? "bg-zinc-700/80 hover:bg-zinc-600 text-white"
-                : "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20"
-            }`}
-            title={isPublishingMicrophone ? "Mute Mic" : "Unmute Mic"}
-          >
-            {isPublishingMicrophone ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-          </Button>
-
-          <Button
-            type="button"
-            size="icon"
-            onClick={() => setIsDeafened((current) => !current)}
-            className={`h-11 w-11 rounded-2xl transition shadow-lg ${
-              isDeafened
-                ? "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20"
-                : "bg-zinc-700/80 hover:bg-zinc-600 text-white"
-            }`}
-            title={isDeafened ? "Undeafen Audio" : "Deafen Audio"}
-          >
-            {isDeafened ? <VolumeX className="w-5 h-5" /> : <Headphones className="w-5 h-5" />}
-          </Button>
-
-          <Button
-            type="button"
-            size="icon"
-            onClick={toggleCamera}
-            className={`h-11 w-11 rounded-2xl transition shadow-lg ${
-              isCameraEnabled
-                ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
-                : "bg-zinc-700/80 hover:bg-zinc-600 text-white"
-            }`}
-            title={isCameraEnabled ? "Turn Off Camera" : "Turn On Camera"}
-          >
-            {isCameraEnabled ? <Camera className="w-5 h-5" /> : <CameraOff className="w-5 h-5" />}
-          </Button>
-
-          {video && (
-            <Button
-              type="button"
-              size="icon"
-              onClick={toggleScreenShare}
-              className={`h-11 w-11 rounded-2xl transition shadow-lg ${
-                isScreenShareEnabled
-                  ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20"
-                  : "bg-zinc-700/80 hover:bg-zinc-600 text-white"
-              }`}
-              title={isScreenShareEnabled ? "Stop Sharing Screen" : "Share Screen"}
-            >
-              <Computer className="w-5 h-5" />
-            </Button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleHangup}
-            className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-10 px-4 rounded-xl shadow-lg shadow-rose-600/20 flex items-center gap-2"
-          >
-            <PhoneOff className="w-4 h-4" />
-            <span className="hidden sm:inline">Leave</span>
-          </Button>
-        </div>
+        <span className="max-w-[160px] truncate">{participant.user.name}</span>
       </div>
     </div>
   );
@@ -396,22 +229,21 @@ function LiveKitCallView({
 
 export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   const { user, isLoaded } = useUser();
+  const { socket } = useSocket();
   const { isExpired, extendLifespan } = useServerTemporary(serverId);
 
   // Pre-join Preview State
   const [hasJoined, setHasJoined] = useState(false);
 
-  // LiveKit State
-  const [token, setToken] = useState("");
-  const [liveKitServerUrl, setLiveKitServerUrl] = useState("");
-  const [useFallbackStudio, setUseFallbackStudio] = useState(true);
-  const [isLiveKitLoading, setIsLiveKitLoading] = useState(false);
-  const [liveKitError, setLiveKitError] = useState("");
-
   // WebRTC Local Media & Preview Streams State
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
+
+  // Remote WebRTC Participants Map
+  const [remoteParticipants, setRemoteParticipants] = useState<Map<string, PeerParticipant>>(new Map());
+  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const localStreamRef = useRef<MediaStream | null>(null);
 
   const [isMuted, setIsMuted] = useState(!audio);
   const [isVideoOff, setIsVideoOff] = useState(!video);
@@ -433,91 +265,47 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     window.location.href = serverId ? `/servers/${serverId}` : "/";
   }, [serverId]);
 
-  const getLiveKitIdentity = useCallback((userId: string) => {
-    const randomPart =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const userName = user?.fullName || user?.username || "You";
 
-    return `${userId}-${randomPart}`;
-  }, []);
+  // Combine local audio + camera tracks into a master local stream
+  const getCombinedLocalStream = useCallback(() => {
+    if (!localStreamRef.current) {
+      localStreamRef.current = new MediaStream();
+    }
+    const combined = localStreamRef.current;
 
-  // 1. Check LiveKit Token with fallback timeout
-  useEffect(() => {
-    if (!isLoaded) return;
-    if (!user?.id || isExpired) {
-      setIsLiveKitLoading(false);
-      return;
+    // Add audio track
+    if (audioStream) {
+      const audioTrack = audioStream.getAudioTracks()[0];
+      if (audioTrack && !combined.getAudioTracks().includes(audioTrack)) {
+        combined.getAudioTracks().forEach((t) => combined.removeTrack(t));
+        combined.addTrack(audioTrack);
+      }
     }
 
-    let isMounted = true;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-    (async () => {
-      try {
-        setIsLiveKitLoading(true);
-        setLiveKitError("");
-        const params = new URLSearchParams({
-          room: chatId,
-          identity: getLiveKitIdentity(user.id),
-          name:
-            user.fullName ||
-            user.username ||
-            user.primaryEmailAddress?.emailAddress ||
-            "User",
-          image: user.imageUrl || "",
-        });
-
-        const response = await fetch(`/api/livekit?${params.toString()}`, {
-          credentials: "same-origin",
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        const data = await response.json();
-
-        if (!isMounted) return;
-
-        if (!response.ok || !data.token || !data.wsUrl) {
-          setToken("");
-          setLiveKitServerUrl("");
-          setUseFallbackStudio(true);
-          setLiveKitError(data?.error || "");
-          return;
-        }
-
-        setToken(data.token);
-        setLiveKitServerUrl(data.wsUrl);
-        setUseFallbackStudio(false);
-        setLiveKitError("");
-      } catch (err) {
-        if (!isMounted) return;
-        setToken("");
-        setLiveKitServerUrl("");
-        setUseFallbackStudio(true);
-      } finally {
-        if (isMounted) {
-          setIsLiveKitLoading(false);
-        }
+    // Add video track
+    if (cameraStream && !isVideoOff) {
+      const videoTrack = cameraStream.getVideoTracks()[0];
+      if (videoTrack && !combined.getVideoTracks().includes(videoTrack)) {
+        combined.getVideoTracks().forEach((t) => combined.removeTrack(t));
+        combined.addTrack(videoTrack);
       }
-    })();
+    } else if (isVideoOff) {
+      combined.getVideoTracks().forEach((t) => combined.removeTrack(t));
+    }
 
-    return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
-  }, [isLoaded, user?.id, user?.fullName, user?.username, user?.primaryEmailAddress, user?.imageUrl, chatId, isExpired, getLiveKitIdentity]);
+    return combined;
+  }, [audioStream, cameraStream, isVideoOff]);
 
-  // 2. Initialize Microphone & Live Sound Meter
+  // 1. Initialize Microphone & Live Sound Meter
   const initAudio = useCallback(async () => {
     try {
       const aStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
-        }
+          autoGainControl: true,
+        },
       });
       setAudioStream(aStream);
 
@@ -537,21 +325,18 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
           if (!analyserRef.current) return;
           analyserRef.current.getByteFrequencyData(dataArray);
           let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i];
-          }
-          const avg = sum / dataArray.length;
-          setAudioLevel(avg);
+          for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+          setAudioLevel(sum / dataArray.length);
           animFrameRef.current = requestAnimationFrame(checkVolume);
         };
         checkVolume();
       }
     } catch (e) {
-      console.log("Audio permission or device notice:", e);
+      console.log("Audio permission notice:", e);
     }
   }, []);
 
-  // 3. Initialize Camera Preview
+  // 2. Initialize Camera Preview
   const initCamera = useCallback(async () => {
     if (!video) return;
     try {
@@ -566,7 +351,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     }
   }, [video]);
 
-  // Initialize preview on mount
+  // Setup preview on initial load
   useEffect(() => {
     if (!isExpired) {
       initAudio();
@@ -588,25 +373,19 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   // Cleanup all media tracks on unmount
   useEffect(() => {
     return () => {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach((t) => t.stop());
-      }
-      if (screenStream) {
-        screenStream.getTracks().forEach((t) => t.stop());
-      }
-      if (audioStream) {
-        audioStream.getTracks().forEach((t) => t.stop());
-      }
+      if (cameraStream) cameraStream.getTracks().forEach((t) => t.stop());
+      if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
+      if (audioStream) audioStream.getTracks().forEach((t) => t.stop());
+      peerConnectionsRef.current.forEach((pc) => pc.close());
+      peerConnectionsRef.current.clear();
     };
   }, [cameraStream, screenStream, audioStream]);
 
-  // Set Camera Video Refs (both preview & in-call)
+  // Set Video Refs
   const setCameraVideoRef = useCallback((node: HTMLVideoElement | null) => {
     localVideoRef.current = node;
     if (node && cameraStream) {
-      if (node.srcObject !== cameraStream) {
-        node.srcObject = cameraStream;
-      }
+      if (node.srcObject !== cameraStream) node.srcObject = cameraStream;
       node.play().catch(() => {});
     }
   }, [cameraStream]);
@@ -614,9 +393,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   const setPreviewVideoRef = useCallback((node: HTMLVideoElement | null) => {
     previewVideoRef.current = node;
     if (node && cameraStream) {
-      if (node.srcObject !== cameraStream) {
-        node.srcObject = cameraStream;
-      }
+      if (node.srcObject !== cameraStream) node.srcObject = cameraStream;
       node.play().catch(() => {});
     }
   }, [cameraStream]);
@@ -624,9 +401,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   const setScreenVideoRef = useCallback((node: HTMLVideoElement | null) => {
     screenVideoRef.current = node;
     if (node && screenStream) {
-      if (node.srcObject !== screenStream) {
-        node.srcObject = screenStream;
-      }
+      if (node.srcObject !== screenStream) node.srcObject = screenStream;
       node.play().catch(() => {});
     }
   }, [screenStream]);
@@ -652,13 +427,244 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     }
   }, [screenStream, isScreenSharing]);
 
+  // =========================================================================
+  // WebRTC Mesh Multi-Peer Connection Logic
+  // =========================================================================
+  const createPeerConnection = useCallback((targetSocketId: string, participantUser: any, participantMedia: any, isInitiator: boolean) => {
+    if (!socket) return null;
+
+    if (peerConnectionsRef.current.has(targetSocketId)) {
+      peerConnectionsRef.current.get(targetSocketId)?.close();
+    }
+
+    const pc = new RTCPeerConnection(rtcConfig);
+    peerConnectionsRef.current.set(targetSocketId, pc);
+
+    // 1. Add all local tracks (Microphone + Camera) to the connection
+    const combined = getCombinedLocalStream();
+    combined.getTracks().forEach((track) => {
+      pc.addTrack(track, combined);
+    });
+
+    // 2. Handle ICE Candidates
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket.emit("call:signal", {
+          to: targetSocketId,
+          signal: { type: "candidate", candidate: event.candidate },
+        });
+      }
+    };
+
+    // 3. Handle incoming remote stream tracks
+    const remoteStream = new MediaStream();
+    pc.ontrack = (event) => {
+      event.streams[0]?.getTracks().forEach((track) => {
+        if (!remoteStream.getTracks().includes(track)) {
+          remoteStream.addTrack(track);
+        }
+      });
+
+      setRemoteParticipants((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(targetSocketId) || {
+          socketId: targetSocketId,
+          user: participantUser,
+          mediaState: participantMedia,
+        };
+        next.set(targetSocketId, { ...existing, stream: remoteStream });
+        return next;
+      });
+    };
+
+    // 4. Handle Negotiation / Disconnection
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "disconnected" || pc.connectionState === "failed" || pc.connectionState === "closed") {
+        setRemoteParticipants((prev) => {
+          const next = new Map(prev);
+          next.delete(targetSocketId);
+          return next;
+        });
+        peerConnectionsRef.current.delete(targetSocketId);
+      }
+    };
+
+    // If initiator (newcomer to existing members), create SDP Offer
+    if (isInitiator) {
+      pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      })
+        .then((offer) => pc.setLocalDescription(offer))
+        .then(() => {
+          socket.emit("call:signal", {
+            to: targetSocketId,
+            signal: { type: "offer", sdp: pc.localDescription },
+          });
+        })
+        .catch((err) => console.error("Error creating WebRTC offer:", err));
+    }
+
+    return pc;
+  }, [socket, getCombinedLocalStream]);
+
+  // Connect to the room when user clicks "Join"
+  useEffect(() => {
+    if (!hasJoined || !socket || !user?.id) return;
+
+    const currentMediaState = {
+      isMuted,
+      isVideoOff,
+      isScreenSharing,
+    };
+
+    // Join room on socket
+    socket.emit("call:join_room", {
+      roomId: chatId,
+      user: {
+        id: user.id,
+        name: userName,
+        imageUrl: user.imageUrl,
+      },
+      mediaState: currentMediaState,
+    });
+
+    // 1. Existing participants received upon joining
+    const handleAllParticipants = (participants: Array<{ socketId: string; user: any; mediaState: any }>) => {
+      participants.forEach((p) => {
+        setRemoteParticipants((prev) => {
+          const next = new Map(prev);
+          next.set(p.socketId, {
+            socketId: p.socketId,
+            user: p.user,
+            mediaState: p.mediaState,
+          });
+          return next;
+        });
+
+        // Initiate WebRTC connection to existing participant
+        createPeerConnection(p.socketId, p.user, p.mediaState, true);
+      });
+    };
+
+    // 2. New user joined after us
+    const handleUserJoined = (data: { socketId: string; user: any; mediaState: any }) => {
+      setRemoteParticipants((prev) => {
+        const next = new Map(prev);
+        next.set(data.socketId, {
+          socketId: data.socketId,
+          user: data.user,
+          mediaState: data.mediaState,
+        });
+        return next;
+      });
+    };
+
+    // 3. Handle WebRTC signals (Offers, Answers, ICE Candidates)
+    const handleSignal = async (data: { from: string; signal: any; user: any; mediaState: any }) => {
+      const { from, signal, user: senderUser, mediaState: senderMedia } = data;
+      let pc = peerConnectionsRef.current.get(from);
+
+      if (signal.type === "offer") {
+        if (!pc) {
+          pc = createPeerConnection(from, senderUser, senderMedia, false)!;
+        }
+
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+
+          socket.emit("call:signal", {
+            to: from,
+            signal: { type: "answer", sdp: pc.localDescription },
+          });
+        } catch (e) {
+          console.error("Error handling WebRTC offer:", e);
+        }
+      } else if (signal.type === "answer") {
+        if (pc) {
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          } catch (e) {
+            console.error("Error setting remote answer:", e);
+          }
+        }
+      } else if (signal.type === "candidate") {
+        if (pc) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          } catch (e) {
+            console.error("Error adding ICE candidate:", e);
+          }
+        }
+      }
+    };
+
+    // 4. Remote participant updated their media state (Mute / Camera)
+    const handleUserMediaState = (data: { socketId: string; mediaState: any }) => {
+      setRemoteParticipants((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(data.socketId);
+        if (existing) {
+          next.set(data.socketId, { ...existing, mediaState: data.mediaState });
+        }
+        return next;
+      });
+    };
+
+    // 5. Participant left
+    const handleUserLeft = (data: { socketId: string }) => {
+      setRemoteParticipants((prev) => {
+        const next = new Map(prev);
+        next.delete(data.socketId);
+        return next;
+      });
+      const pc = peerConnectionsRef.current.get(data.socketId);
+      if (pc) {
+        pc.close();
+        peerConnectionsRef.current.delete(data.socketId);
+      }
+    };
+
+    socket.on("call:all_participants", handleAllParticipants);
+    socket.on("call:user_joined", handleUserJoined);
+    socket.on("call:signal", handleSignal);
+    socket.on("call:user_media_state", handleUserMediaState);
+    socket.on("call:user_left", handleUserLeft);
+
+    return () => {
+      socket.off("call:all_participants", handleAllParticipants);
+      socket.off("call:user_joined", handleUserJoined);
+      socket.off("call:signal", handleSignal);
+      socket.off("call:user_media_state", handleUserMediaState);
+      socket.off("call:user_left", handleUserLeft);
+      socket.emit("call:leave_room", { roomId: chatId });
+    };
+  }, [hasJoined, socket, user?.id, userName, chatId, createPeerConnection]);
+
+  // Update peers when our media state changes
+  const broadcastMediaState = useCallback((newMuted: boolean, newVideoOff: boolean, newScreenSharing: boolean) => {
+    if (socket && hasJoined) {
+      socket.emit("call:media_state", {
+        roomId: chatId,
+        mediaState: {
+          isMuted: newMuted,
+          isVideoOff: newVideoOff,
+          isScreenSharing: newScreenSharing,
+        },
+      });
+    }
+  }, [socket, hasJoined, chatId]);
+
   // Toggle Microphone
   const toggleMute = () => {
+    const nextMuted = !isMuted;
     if (audioStream) {
-      const audioTracks = audioStream.getAudioTracks();
-      audioTracks.forEach((t) => (t.enabled = isMuted));
+      audioStream.getAudioTracks().forEach((t) => (t.enabled = !nextMuted));
     }
-    setIsMuted(!isMuted);
+    setIsMuted(nextMuted);
+    broadcastMediaState(nextMuted, isVideoOff, isScreenSharing);
   };
 
   // Toggle Camera
@@ -674,6 +680,20 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         setCameraStream(stream);
         setIsVideoOff(false);
         setMediaPermissionMessage("");
+
+        // Replace or add video track on peer connections
+        const videoTrack = stream.getVideoTracks()[0];
+        peerConnectionsRef.current.forEach((pc) => {
+          const senders = pc.getSenders();
+          const videoSender = senders.find((s) => s.track?.kind === "video");
+          if (videoSender) {
+            videoSender.replaceTrack(videoTrack);
+          } else {
+            pc.addTrack(videoTrack, stream);
+          }
+        });
+
+        broadcastMediaState(isMuted, false, isScreenSharing);
       } catch (err) {
         console.error("Camera access failed:", err);
         setMediaPermissionMessage(getCameraErrorMessage(err));
@@ -682,6 +702,17 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       cameraStream.getTracks().forEach((t) => t.stop());
       setCameraStream(null);
       setIsVideoOff(true);
+
+      // Disable video sender on peer connections
+      peerConnectionsRef.current.forEach((pc) => {
+        const senders = pc.getSenders();
+        const videoSender = senders.find((s) => s.track?.kind === "video");
+        if (videoSender) {
+          videoSender.replaceTrack(null);
+        }
+      });
+
+      broadcastMediaState(isMuted, true, isScreenSharing);
     }
   };
 
@@ -691,21 +722,24 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       screenStream.getTracks().forEach((t) => t.stop());
       setScreenStream(null);
       setIsScreenSharing(false);
+      broadcastMediaState(isMuted, isVideoOff, false);
     } else {
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: { displaySurface: "monitor" } as any,
-          audio: false
+          audio: false,
         });
 
         setScreenStream(stream);
         setIsScreenSharing(true);
+        broadcastMediaState(isMuted, isVideoOff, true);
 
         const videoTrack = stream.getVideoTracks()[0];
         if (videoTrack) {
           videoTrack.onended = () => {
             setScreenStream(null);
             setIsScreenSharing(false);
+            broadcastMediaState(isMuted, isVideoOff, false);
           };
         }
       } catch (err) {
@@ -744,8 +778,6 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       </div>
     );
   }
-
-  const userName = user?.fullName || user?.username || "You";
 
   // =========================================================================
   // 1. PRE-JOIN PREVIEW SCREEN (Camera & Mic Preview / Setup Lobby)
@@ -930,33 +962,14 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   }
 
   // =========================================================================
-  // 2. LIVEKIT ACTIVE CALL (When valid LiveKit token & URL exist)
+  // 2. IN-CALL MULTI-PEER VOICE & VIDEO STUDIO (Bidirectional WebRTC)
   // =========================================================================
-  if (!useFallbackStudio && token !== "" && liveKitServerUrl) {
-    return (
-      <LiveKitRoom
-        video={false}
-        audio={false}
-        token={token}
-        connect={true}
-        serverUrl={liveKitServerUrl}
-        data-lk-theme="default"
-        onError={(error) => {
-          console.error("LiveKit room error:", error);
-          setUseFallbackStudio(true);
-        }}
-      >
-        <LiveKitCallView onHangup={navigateAway} userImageUrl={user?.imageUrl} audio={audio} video={video} />
-      </LiveKitRoom>
-    );
-  }
+  const remoteList = Array.from(remoteParticipants.values());
+  const totalCallers = 1 + remoteList.length;
 
-  // =========================================================================
-  // 3. BUILT-IN WEBRTC STUDIO (Interactive Voice & Video Conference)
-  // =========================================================================
   return (
     <div className="relative flex flex-1 flex-col h-full bg-[#111214] text-white overflow-hidden select-none">
-      {/* Top Banner Warning if Permission Blocked */}
+      {/* Top Warning Banner if Permissions Blocked */}
       {mediaPermissionMessage && (
         <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 backdrop-blur-sm">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -976,11 +989,13 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         </div>
       )}
 
-      {/* Channel Top Header Bar */}
+      {/* Top Header Bar */}
       <div className="h-12 px-4 bg-[#18191c] border-b border-white/5 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 text-xs font-bold text-zinc-200">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Voice Connected / HD Audio & Video</span>
+          <span>
+            Voice Connected • {totalCallers} {totalCallers === 1 ? "Person" : "People"} in Call
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -1005,9 +1020,17 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         </div>
       </div>
 
-      {/* Main Video & Audio Conference Grid */}
+      {/* Main Multi-Participant Grid */}
       <div className="flex-1 p-4 pb-24 overflow-y-auto">
-        <div className="grid h-full min-h-[360px] gap-4 grid-cols-1 md:grid-cols-2">
+        <div
+          className={`grid h-full min-h-[360px] gap-4 ${
+            totalCallers === 1
+              ? "grid-cols-1 md:grid-cols-2"
+              : totalCallers === 2
+              ? "grid-cols-1 md:grid-cols-2"
+              : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+          }`}
+        >
           {/* Tile 1: Local User Video / Avatar */}
           <div
             className={`relative flex min-h-[260px] items-center justify-center overflow-hidden rounded-2xl border transition-all duration-200 ${
@@ -1055,50 +1078,61 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
             </div>
           </div>
 
-          {/* Tile 2: Screen Sharing or Room Activity Lounge */}
-          <div className="relative flex min-h-[260px] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(ellipse_at_top,_rgba(49,46,129,0.5),_rgba(17,18,20,0.95))] p-6 shadow-2xl">
-            {isScreenSharing && screenStream ? (
-              <video
-                ref={setScreenVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className="h-full w-full object-contain bg-black rounded-xl"
-              />
-            ) : (
-              <div className="flex flex-col items-center gap-4 text-center max-w-sm">
-                <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 shadow-xl">
-                  <Sparkles className="h-9 w-9 animate-pulse" />
+          {/* Remote Participants Tiles (Real 2-Way Connected Users!) */}
+          {remoteList.map((participant) => (
+            <RemoteParticipantTile
+              key={participant.socketId}
+              participant={participant}
+              isDeafened={isDeafened}
+            />
+          ))}
+
+          {/* If alone in the call, show Screen Share / Waiting Lounge */}
+          {remoteList.length === 0 && (
+            <div className="relative flex min-h-[260px] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(ellipse_at_top,_rgba(49,46,129,0.5),_rgba(17,18,20,0.95))] p-6 shadow-2xl">
+              {isScreenSharing && screenStream ? (
+                <video
+                  ref={setScreenVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="h-full w-full object-contain bg-black rounded-xl"
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-4 text-center max-w-sm">
+                  <div className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 shadow-xl">
+                    <Sparkles className="h-9 w-9 animate-pulse" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-base font-bold text-white">Voice & Video Room Active</h4>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      You are in the room. When other members join, their 2-way audio and video will connect automatically!
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={copyChannelUrl}
+                      className="h-8 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20"
+                    >
+                      <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                      Copy Room Link
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={toggleScreenShare}
+                      className="h-8 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs border border-white/10"
+                    >
+                      <Computer className="h-3.5 w-3.5 mr-1.5" />
+                      Share Screen
+                    </Button>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <h4 className="text-base font-bold text-white">Voice & Video Room Active</h4>
-                  <p className="text-xs text-zinc-400 leading-relaxed">
-                    Share your screen, turn on camera, or invite other members to join this channel!
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={copyChannelUrl}
-                    className="h-8 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20"
-                  >
-                    <UserPlus className="h-3.5 w-3.5 mr-1.5" />
-                    Invite Members
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={toggleScreenShare}
-                    className="h-8 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs border border-white/10"
-                  >
-                    <Computer className="h-3.5 w-3.5 mr-1.5" />
-                    Share Screen
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1190,6 +1224,8 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
               if (cameraStream) cameraStream.getTracks().forEach((t) => t.stop());
               if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
               if (audioStream) audioStream.getTracks().forEach((t) => t.stop());
+              peerConnectionsRef.current.forEach((pc) => pc.close());
+              peerConnectionsRef.current.clear();
               navigateAway();
             }}
             className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-10 px-4 rounded-xl shadow-lg shadow-rose-600/20 flex items-center gap-2"
