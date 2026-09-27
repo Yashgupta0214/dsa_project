@@ -14,24 +14,22 @@ import {
 import { ConnectionState, Track, createLocalAudioTrack } from "livekit-client";
 import { useUser } from "@clerk/nextjs";
 import {
-  Activity,
   Camera,
   CameraOff,
   Computer,
-  Copy,
-  Check,
+  Gamepad2,
   Headphones,
   Info,
   Loader2,
   Lock,
   Mic,
   MicOff,
+  MoreHorizontal,
   PhoneOff,
-  Radio,
   Sparkles,
   Timer,
+  UserPlus,
   VolumeX,
-  Wifi
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user-avatar";
@@ -42,6 +40,37 @@ interface MediaRoomProps {
   video: boolean;
   audio: boolean;
   serverId?: string;
+}
+
+const cameraConstraints: MediaStreamConstraints = {
+  video: {
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    facingMode: "user",
+  },
+  audio: false,
+};
+
+function getCameraErrorMessage(error: unknown) {
+  const name = error instanceof DOMException ? error.name : "";
+
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return "Camera permission is blocked for this site. Allow camera access in the browser and try again.";
+  }
+
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return "No camera device was found. Connect a webcam and try again.";
+  }
+
+  if (name === "NotReadableError" || name === "TrackStartError") {
+    return "Your camera is already in use by another app or browser tab. Close it there, then try again.";
+  }
+
+  if (name === "OverconstrainedError" || name === "ConstraintNotSatisfiedError") {
+    return "The camera could not use the requested quality. Trying again should use a compatible webcam mode.";
+  }
+
+  return "Camera could not be opened. Please check webcam permissions and try again.";
 }
 
 function parseParticipantMetadata(metadata?: string | null) {
@@ -360,10 +389,8 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   const [isVideoOff, setIsVideoOff] = useState(!video);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
-  const [audioLevel, setAudioLevel] = useState(0);
-  const [ping, setPing] = useState(24);
+  const [, setAudioLevel] = useState(0);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [showConfigGuide, setShowConfigGuide] = useState(false);
   const [mediaPermissionMessage, setMediaPermissionMessage] = useState("");
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -478,16 +505,14 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   const initCamera = useCallback(async () => {
     if (!video) return;
     try {
-      const vStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 },
-        audio: false
-      });
+      const vStream = await navigator.mediaDevices.getUserMedia(cameraConstraints);
       setCameraStream(vStream);
       setIsVideoOff(false);
+      setMediaPermissionMessage("");
     } catch (e) {
       console.log("Webcam not available or permission denied on init:", e);
       setIsVideoOff(true);
-      setMediaPermissionMessage("Camera access is blocked. Please allow camera permission for this site and refresh the page.");
+      setMediaPermissionMessage(getCameraErrorMessage(e));
     }
   }, [video]);
 
@@ -579,16 +604,13 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
 
     if (isVideoOff || !cameraStream) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 1280, height: 720 },
-          audio: false
-        });
+        const stream = await navigator.mediaDevices.getUserMedia(cameraConstraints);
         setCameraStream(stream);
         setIsVideoOff(false);
         setMediaPermissionMessage("");
       } catch (err) {
         console.error("Camera access failed:", err);
-        setMediaPermissionMessage("Camera could not be opened. Please verify webcam permissions are allowed for this site and try again.");
+        setMediaPermissionMessage(getCameraErrorMessage(err));
       }
     } else {
       cameraStream.getTracks().forEach((t) => t.stop());
@@ -627,14 +649,6 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       }
     }
   };
-
-  // Ping jitter simulation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPing(Math.floor(20 + Math.random() * 12));
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Copy Channel Link
   const copyChannelUrl = () => {
@@ -729,11 +743,10 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   }
 
   // Built-in Interactive WebRTC Voice & Video Conference Studio
-  const isSpeaking = !isMuted && audioLevel > 18;
   const userName = user?.fullName || user?.username || "You";
 
   return (
-    <div className="flex flex-1 flex-col h-full bg-[#111214] text-white overflow-hidden select-none">
+    <div className="relative flex flex-1 flex-col h-full bg-[#111214] text-white overflow-hidden select-none">
       {mediaPermissionMessage && (
         <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 backdrop-blur-sm">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -752,174 +765,91 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
           </div>
         </div>
       )}
-      {/* Top Header Bar */}
-      <div className="h-12 px-4 bg-[#18191c]/80 border-b border-white/5 flex items-center justify-between shrink-0 backdrop-blur-md z-10">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold">
-            <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
-            <span>Voice Connected</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-mono">
-            <Wifi className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{ping}ms</span>
-            <span className="text-zinc-600">•</span>
-            <span>64kbps HD</span>
-          </div>
+      <div className="h-10 px-1.5 bg-black flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 text-xs font-semibold text-zinc-300">
+          <VolumeX className="h-4 w-4 text-zinc-500" />
+          <span>General</span>
         </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={copyChannelUrl}
-            className="h-7 px-2.5 text-[11px] border-white/10 hover:bg-white/5 text-zinc-300"
+        <button
+          type="button"
+          onClick={copyChannelUrl}
+          className="h-7 rounded-md px-2 text-[11px] font-semibold text-zinc-500 hover:bg-white/5 hover:text-zinc-200"
+          title="Copy room link"
+        >
+          {copiedLink ? "Copied" : ""}
+        </button>
+      </div>
+      <div className="flex-1 bg-black px-0 pb-24 pt-[126px]">
+        <div className="grid h-full min-h-[360px] gap-1 md:grid-cols-[minmax(0,1.04fr)_minmax(0,1fr)]">
+          <div
+            className={`relative flex min-h-[260px] items-center justify-center overflow-hidden rounded-[4px] ${
+              !isVideoOff && cameraStream ? "bg-black" : "bg-[#ef3f43]"
+            }`}
           >
-            {copiedLink ? (
-              <>
-                <Check className="w-3 h-3 mr-1 text-emerald-400" /> Copied!
-              </>
+            {!isVideoOff && cameraStream ? (
+              <video
+                ref={setCameraVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="h-full w-full object-cover scale-x-[-1] bg-black"
+              />
             ) : (
-              <>
-                <Copy className="w-3 h-3 mr-1 text-zinc-400" /> Share Room
-              </>
-            )}
-          </Button>
-
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShowConfigGuide(!showConfigGuide)}
-            className="h-7 px-2 text-[11px] text-zinc-400 hover:text-white"
-            title="LiveKit Cloud Setup (Optional)"
-          >
-            <Info className="w-3.5 h-3.5 mr-1 text-indigo-400" />
-            {showConfigGuide ? "Hide Setup" : "LiveKit Setup"}
-          </Button>
-        </div>
-      </div>
-
-      {/* Optional LiveKit Cloud Setup Info Banner */}
-      {showConfigGuide && (
-        <div className="p-3.5 bg-indigo-950/40 border-b border-indigo-500/20 text-xs text-zinc-300 flex items-start justify-between gap-3 animate-in slide-in-from-top-2 duration-200">
-          <div className="space-y-1">
-            <p className="font-bold text-indigo-300 flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-indigo-400" />
-              Built-in WebRTC Audio/Video Mode is Active!
-            </p>
-            <p className="text-[11px] text-zinc-400 leading-relaxed">
-              Your voice & video channel is fully functional with live camera, screen sharing, and audio visualizer.
-              To connect external LiveKit Cloud clusters for hundreds of simultaneous speakers, add{" "}
-              <code className="bg-black/40 text-amber-300 px-1.5 py-0.5 rounded font-mono">NEXT_PUBLIC_LIVEKIT_URL</code>,{" "}
-              <code className="bg-black/40 text-amber-300 px-1.5 py-0.5 rounded font-mono">LIVEKIT_API_KEY</code>, and{" "}
-              <code className="bg-black/40 text-amber-300 px-1.5 py-0.5 rounded font-mono">LIVEKIT_API_SECRET</code> to your{" "}
-              <code className="text-indigo-300 font-mono">.env</code> file.
-            </p>
-          </div>
-          <button
-            onClick={() => setShowConfigGuide(false)}
-            className="text-zinc-400 hover:text-white text-xs px-2 py-1 rounded bg-white/5 hover:bg-white/10"
-          >
-            Got it
-          </button>
-        </div>
-      )}
-
-      {/* Main Video & Audio Stage Grid */}
-      <div className="flex-1 p-4">
-        <div className="mx-auto flex h-full max-w-6xl flex-col gap-4">
-          <div className="grid flex-1 gap-4 md:grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.9fr)]">
-            {/* Screen Share Tile (if active) */}
-            {isScreenSharing && (
-              <div className="relative w-full h-[280px] md:h-[420px] rounded-[26px] bg-[#1e1f22] border border-indigo-500/40 overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.55)] flex flex-col items-center justify-center group animate-in fade-in duration-200">
-                <video
-                  ref={setScreenVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-contain bg-[#0b0d11]"
-                />
-                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-md text-[11px] font-bold text-white flex items-center gap-1.5 border border-white/10 shadow-md">
-                  <Computer className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-                  <span>{userName}&apos;s Screen</span>
-                </div>
+              <div className="flex h-full w-full items-center justify-center">
+                <Gamepad2 className="h-8 w-8 fill-white stroke-white" />
               </div>
             )}
 
-            {/* Primary User Tile (Voice / Camera) */}
-            <div
-              className={`relative w-full h-full min-h-[260px] md:min-h-[420px] rounded-[26px] bg-[radial-gradient(circle_at_top,_rgba(88,101,242,0.18),_rgba(17,18,20,0.96)_45%)] border ${
-                isSpeaking ? "border-emerald-500 shadow-[0_0_0_1px_rgba(16,185,129,0.35),0_24px_60px_rgba(16,185,129,0.15)]" : "border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.45)]"
-              } transition-all duration-150 overflow-hidden flex flex-col items-center justify-center group backdrop-blur-sm`}
-            >
-              {/* Active Camera Video Stream */}
-              {!isVideoOff && cameraStream ? (
-                <video
-                  ref={setCameraVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="h-full w-full object-cover scale-x-[-1] bg-[#0b0d11]"
-                />
-              ) : (
-                /* Voice Avatar Tile with Speaking Glow */
-                <div className="flex flex-col items-center justify-center p-6 space-y-4">
-                  <div className="relative">
-                    <div
-                      className={`absolute -inset-2 rounded-full transition-all duration-75 ${
-                        isSpeaking
-                          ? "bg-emerald-500/30 scale-110 blur-sm ring-4 ring-emerald-500/70"
-                          : "bg-transparent scale-100"
-                      }`}
-                    />
-                    <UserAvatar
-                      src={user?.imageUrl}
-                      className="h-24 w-24 md:h-32 md:w-32 ring-2 ring-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.4)] relative z-10"
-                    />
-                    {isSpeaking && (
-                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold shadow-md z-20">
-                        <Activity className="w-3 h-3 animate-pulse" /> Speaking
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="text-center">
-                    <h4 className="text-base font-bold text-white flex items-center justify-center gap-1.5">
-                      {userName}
-                      {isMuted && <MicOff className="w-4 h-4 text-rose-500 ml-1" />}
-                    </h4>
-                    <p className="text-xs text-zinc-400 mt-0.5">
-                      {isSpeaking ? "🟢 Broadcasting Voice" : isMuted ? "🔴 Microphone Muted" : "Listening..."}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-xs font-semibold text-white flex items-center gap-2 border border-white/10">
-                <span>{userName} (You)</span>
-                {isMuted ? (
-                  <span className="p-0.5 rounded bg-rose-500/20 text-rose-400">
-                    <MicOff className="w-3 h-3" />
-                  </span>
-                ) : (
-                  <span className="p-0.5 rounded bg-emerald-500/20 text-emerald-400">
-                    <Mic className="w-3 h-3" />
-                  </span>
-                )}
-              </div>
-
-              <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                <span className="px-2 py-0.5 rounded-md bg-black/50 text-[10px] font-mono text-zinc-300 border border-white/5">
-                  1080p 60fps
-                </span>
-              </div>
+            <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded bg-black/35 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+              {isMuted ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+              <span className="max-w-[160px] truncate">{userName}</span>
             </div>
+
+            <button
+              type="button"
+              className="absolute bottom-2 right-2 flex h-5 w-7 items-center justify-center rounded bg-black/35 text-white backdrop-blur-sm hover:bg-black/55"
+              title="More"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="relative flex min-h-[260px] items-center justify-center overflow-hidden rounded-[4px] bg-[radial-gradient(circle_at_center,_rgba(74,21,85,0.72),_rgba(9,0,8,0.98)_60%)]">
+            {isScreenSharing ? (
+              <video
+                ref={setScreenVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="h-full w-full object-contain bg-black"
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-5 text-center">
+                <div className="relative flex h-28 w-36 items-center justify-center">
+                  <div className="absolute left-2 top-8 h-12 w-20 -rotate-12 rounded-full bg-[#ff3fb4] shadow-[inset_0_-8px_0_rgba(0,0,0,0.16)]" />
+                  <div className="absolute left-8 top-3 h-14 w-14 rounded-xl border-4 border-[#9ea2ff] bg-[#6c5cff] shadow-[0_10px_0_rgba(36,20,90,0.7)]">
+                    <Sparkles className="m-auto mt-3 h-6 w-6 fill-[#b848ff] text-[#b848ff]" />
+                  </div>
+                  <div className="absolute right-6 top-10 h-10 w-10 rotate-45 bg-[#43d28b] shadow-[0_8px_0_rgba(0,0,0,0.2)]" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className="inline-flex h-7 items-center gap-1.5 rounded bg-[#27282c] px-3 text-[11px] font-bold text-white shadow hover:bg-[#303136]">
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Invite to Voice
+                  </button>
+                  <button className="inline-flex h-7 items-center gap-1.5 rounded bg-[#27282c] px-3 text-[11px] font-bold text-white shadow hover:bg-[#303136]">
+                    <Gamepad2 className="h-3.5 w-3.5" />
+                    Choose Activity
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
-
       {/* Discord-Style Bottom Control Dock */}
-      <div className="h-20 bg-[#1e1f22]/95 border-t border-white/10 px-4 flex items-center justify-between shrink-0 shadow-[0_-12px_28px_rgba(0,0,0,0.25)] backdrop-blur-xl">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="absolute inset-x-0 bottom-0 h-20 bg-black/95 px-4 flex items-center justify-center shrink-0">
+        <div className="absolute bottom-5 left-1.5 hidden items-center gap-3 min-w-0">
           <UserAvatar src={user?.imageUrl} className="h-9 w-9 ring-1 ring-white/10 shrink-0" />
           <div className="hidden sm:flex flex-col truncate">
             <span className="text-xs font-bold text-white truncate">{userName}</span>
@@ -935,7 +865,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
             type="button"
             size="icon"
             onClick={toggleMute}
-            className={`h-11 w-11 rounded-2xl transition shadow-lg ${
+            className={`h-9 w-11 rounded-lg border border-white/10 transition shadow-lg ${
               isMuted
                 ? "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20"
                 : "bg-zinc-700/80 hover:bg-zinc-600 text-white"
@@ -949,7 +879,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
             type="button"
             size="icon"
             onClick={() => setIsDeafened(!isDeafened)}
-            className={`h-11 w-11 rounded-2xl transition shadow-lg ${
+            className={`h-9 w-11 rounded-lg border border-white/10 transition shadow-lg ${
               isDeafened
                 ? "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20"
                 : "bg-zinc-700/80 hover:bg-zinc-600 text-white"
@@ -963,7 +893,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
             type="button"
             size="icon"
             onClick={toggleVideo}
-            className={`h-11 w-11 rounded-2xl transition shadow-lg ${
+            className={`h-9 w-11 rounded-lg border border-white/10 transition shadow-lg ${
               !isVideoOff && cameraStream
                 ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
                 : "bg-zinc-700/80 hover:bg-zinc-600 text-white"
@@ -977,7 +907,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
             type="button"
             size="icon"
             onClick={toggleScreenShare}
-            className={`h-11 w-11 rounded-2xl transition shadow-lg ${
+            className={`h-9 w-11 rounded-lg border border-white/10 transition shadow-lg ${
               isScreenSharing
                 ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20"
                 : "bg-zinc-700/80 hover:bg-zinc-600 text-white"
@@ -988,7 +918,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-1">
           <Button
             type="button"
             size="sm"
@@ -1004,10 +934,9 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
               }
               navigateAway();
             }}
-            className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-10 px-4 rounded-xl shadow-lg shadow-rose-600/20 flex items-center gap-2"
+            className="bg-[#f23f42] hover:bg-[#d83c3e] text-white font-bold text-xs h-9 w-11 rounded-lg shadow-lg shadow-rose-600/20 flex items-center justify-center"
           >
             <PhoneOff className="w-4 h-4" />
-            <span className="hidden sm:inline">Disconnect</span>
           </Button>
         </div>
       </div>
