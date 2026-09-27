@@ -22,12 +22,25 @@ export function InviteModal() {
   const origin = useOrigin();
 
   const isModalOpen = isOpen && type === "invite";
-  const { server } = data;
-
+  const [currentServer, setCurrentServer] = useState<any>(data?.server || null);
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const inviteUrl = `${origin}/invite/${server?.inviteCode}`;
+  useEffect(() => {
+    if (data?.server) {
+      setCurrentServer(data.server);
+    } else if (data?.serverId && isModalOpen) {
+      setIsLoading(true);
+      axios
+        .get(`/api/servers/${data.serverId}`)
+        .then((res) => setCurrentServer(res.data))
+        .catch((err) => console.error("Error fetching server for invite:", err))
+        .finally(() => setIsLoading(false));
+    }
+  }, [data?.server, data?.serverId, isModalOpen]);
+
+  const server = currentServer || data?.server;
+  const inviteUrl = `${origin}/invite/${server?.inviteCode || ""}`;
 
   const onCopy = () => {
     navigator.clipboard.writeText(inviteUrl);

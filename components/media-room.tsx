@@ -8,9 +8,11 @@ import {
   CameraOff,
   CheckCircle2,
   Computer,
+  Copy,
   Gamepad2,
   Headphones,
   Info,
+  Link,
   Loader2,
   Lock,
   Mic,
@@ -32,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/user-avatar";
 import { useServerTemporary } from "@/hooks/use-server-temporary";
 import { useSocket } from "@/components/providers/socket-provider";
+import { useModal } from "@/hooks/use-modal-store";
 
 interface MediaRoomProps {
   chatId: string;
@@ -230,6 +233,7 @@ function RemoteParticipantTile({
 export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   const { user, isLoaded } = useUser();
   const { socket } = useSocket();
+  const { onOpen } = useModal();
   const { isExpired, extendLifespan } = useServerTemporary(serverId);
 
   // Pre-join Preview State
@@ -1109,23 +1113,38 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
                       You are in the room. When other members join, their 2-way audio and video will connect automatically!
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 mt-2">
+                  <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        if (serverId) {
+                          onOpen("invite", { serverId });
+                        } else {
+                          copyChannelUrl();
+                        }
+                      }}
+                      className="h-8 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition active:scale-95"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Invite Members
+                    </Button>
                     <Button
                       type="button"
                       size="sm"
                       onClick={copyChannelUrl}
-                      className="h-8 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20"
+                      className="h-8 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs border border-white/10 flex items-center gap-1.5 transition active:scale-95"
                     >
-                      <UserPlus className="h-3.5 w-3.5 mr-1.5" />
-                      Copy Room Link
+                      <Link className="h-3.5 w-3.5" />
+                      {copiedLink ? "Link Copied!" : "Copy Room Link"}
                     </Button>
                     <Button
                       type="button"
                       size="sm"
                       onClick={toggleScreenShare}
-                      className="h-8 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs border border-white/10"
+                      className="h-8 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs border border-white/10 flex items-center gap-1.5 transition active:scale-95"
                     >
-                      <Computer className="h-3.5 w-3.5 mr-1.5" />
+                      <Computer className="h-3.5 w-3.5" />
                       Share Screen
                     </Button>
                   </div>
