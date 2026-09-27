@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/user-avatar";
 import { getMemberColor } from "@/lib/member-colors";
+import { usePresence } from "@/components/providers/presence-provider";
 
 interface ServerMemberProps {
   member: Member & { profile: Profile };
@@ -26,10 +27,12 @@ const roleIconMap = {
 export const ServerMember = ({ member, server }: ServerMemberProps) => {
   const params = useParams();
   const router = useRouter();
+  const { getUserStatus } = usePresence();
 
   const icon = roleIconMap[member.role];
   const isActive = params?.memberId === member.id;
   const memberColor = getMemberColor(member.id);
+  const status = getUserStatus(member.profileId);
 
   const onClick = () =>
     router.push(`/servers/${params?.serverId}/conversations/${member.id}`);
@@ -50,6 +53,10 @@ export const ServerMember = ({ member, server }: ServerMemberProps) => {
       )}
       <UserAvatar
         src={member.profile.imageUrl}
+        name={member.profile.name}
+        status={status}
+        statusSize="xs"
+        ringClass="ring-[#f2f3f5] dark:ring-[#1a1b22]"
         className="h-6 w-6 md:h-6 md:w-6 ring-1 ring-black/10 dark:ring-white/10"
       />
       <p

@@ -2,6 +2,19 @@ import { NextResponse } from "next/server";
 import { currentProfile } from "@/lib/current-profile";
 import { db } from "@/lib/db";
 
+export async function GET(req: Request) {
+  try {
+    const profile = await currentProfile();
+    if (!profile) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+    return NextResponse.json(profile);
+  } catch (error) {
+    console.error("[PROFILE_GET]", error);
+    return new NextResponse("Internal Error", { status: 500 });
+  }
+}
+
 export async function PATCH(req: Request) {
   try {
     const profile = await currentProfile();

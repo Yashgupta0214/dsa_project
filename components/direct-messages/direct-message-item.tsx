@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 import { getMemberColor } from "@/lib/member-colors";
+import { usePresence } from "@/components/providers/presence-provider";
 
 interface DirectMessageItemProps {
   member: Pick<
@@ -21,9 +22,11 @@ interface DirectMessageItemProps {
 export function DirectMessageItem({ member }: DirectMessageItemProps) {
   const params = useParams();
   const router = useRouter();
+  const { getUserStatus } = usePresence();
 
   const isActive = params?.memberId === member.id;
   const memberColor = getMemberColor(member.id);
+  const status = getUserStatus(member.profileId);
   const href = `/direct-messages/${member.id}`;
 
   return (
@@ -39,6 +42,10 @@ export function DirectMessageItem({ member }: DirectMessageItemProps) {
     >
       <UserAvatar
         src={member.profile.imageUrl}
+        name={member.profile.name}
+        status={status}
+        statusSize="sm"
+        ringClass="ring-white dark:ring-[#111214]"
         className="h-8 w-8 shrink-0 ring-1 ring-black/5 dark:ring-white/10"
       />
       <div className="min-w-0 flex-1">

@@ -6,6 +6,7 @@ import { ModalProvider } from "@/components/providers/modal-provider";
 import { SocketProvider } from "@/components/providers/socket-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { NotificationProvider } from "@/components/providers/notification-provider";
+import { PresenceProvider } from "@/components/providers/presence-provider";
 
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
@@ -57,12 +58,14 @@ export default function RootLayout({
             storageKey="discord-clone-theme"
           >
             <SocketProvider>
-              <QueryProvider>
-                <NotificationProvider>
-                  <ModalProvider />
-                  {children}
-                </NotificationProvider>
-              </QueryProvider>
+              <PresenceProvider>
+                <QueryProvider>
+                  <NotificationProvider>
+                    <ModalProvider />
+                    {children}
+                  </NotificationProvider>
+                </QueryProvider>
+              </PresenceProvider>
             </SocketProvider>
           </ThemeProvider>
         </ClerkProvider>

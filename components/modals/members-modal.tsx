@@ -27,6 +27,7 @@ import { useModal } from "@/hooks/use-modal-store";
 import { ServerWithMembersWithProfiles } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { UserAvatar } from "@/components/user-avatar";
+import { usePresence } from "@/components/providers/presence-provider";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,6 +48,7 @@ const roleIconMap = {
 
 export function MembersModal() {
   const { isOpen, onOpen, onClose, type, data } = useModal();
+  const { getUserStatus } = usePresence();
   const [loadingId, setLoadingId] = useState("");
 
   const router = useRouter();
@@ -114,6 +116,10 @@ export function MembersModal() {
               >
                 <UserAvatar
                   src={member.profile.imageUrl}
+                  name={member.profile.name}
+                  status={getUserStatus(member.profileId)}
+                  statusSize="sm"
+                  ringClass="ring-white dark:ring-[#1e1f22]"
                   className="ring-1 ring-black/5 dark:ring-white/10"
                 />
                 <div className="flex flex-col gap-y-0.5">
