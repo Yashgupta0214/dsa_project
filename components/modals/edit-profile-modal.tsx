@@ -93,6 +93,7 @@ export function EditProfileModal() {
 
   const [name, setName] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
   const [status, setStatus] = useState<"online" | "idle" | "dnd" | "invisible">("online");
   const [customStatus, setCustomStatus] = useState("");
   const [bannerTheme, setBannerTheme] = useState("nebula");
@@ -107,6 +108,7 @@ export function EditProfileModal() {
     if (profile) {
       setName(profile.name || "");
       setImageUrl(profile.imageUrl || "");
+      setPreviewUrl(profile.imageUrl || "");
     }
     const savedStatus = localStorage.getItem("user_custom_status");
     if (savedStatus) setCustomStatus(savedStatus);
@@ -131,15 +133,6 @@ export function EditProfileModal() {
     }, 100);
   };
 
-  const readFileAsDataUrl = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
   const handleFileUpload = async (file?: File) => {
     if (!file) return;
 
@@ -147,9 +140,9 @@ export function EditProfileModal() {
     setIsUploading(true);
 
     try {
-      // 1. Optimistic Preview
-      const dataUrl = await readFileAsDataUrl(file);
-      setImageUrl(dataUrl);
+      // 1. Instant local preview
+      const localPreview = URL.createObjectURL(file);
+      setPreviewUrl(localPreview);
 
       // 2. Upload to server
       const formData = new FormData();
@@ -161,17 +154,19 @@ export function EditProfileModal() {
         body: formData
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.url) {
-          setImageUrl(data.url);
-        }
-      } else {
-        // Even if server upload has temporary issue, dataUrl preview is preserved
-        console.warn("Server upload fallback: using local data URL");
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || "Failed to upload image to server.");
+      }
+
+      const data = await res.json();
+      if (data.url) {
+        setImageUrl(data.url);
+        setPreviewUrl(data.url);
       }
     } catch (err: any) {
-      console.warn("Upload fallback activated:", err);
+      console.error("Upload failed:", err);
+      setError(err?.message || "Failed to upload photo. Try another image or use an image link.");
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -181,15 +176,34 @@ export function EditProfileModal() {
   const handleUrlSubmit = () => {
     if (customUrlInput.trim()) {
       setImageUrl(customUrlInput.trim());
+      setPreviewUrl(customUrlInput.trim());
       setCustomUrlInput("");
       setShowUrlInput(false);
+      setError("");
     }
+  };
+
+  const handleSelectPreset = (presetUrl: string) => {
+    setImageUrl(presetUrl);
+    setPreviewUrl(presetUrl);
+    setError("");
+  };
+
+  const handleResetAvatar = () => {
+    setImageUrl("");
+    setPreviewUrl("");
+    setError("");
   };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError("Username cannot be empty.");
+      return;
+    }
+
+    if (isUploading) {
+      setError("Please wait for the photo upload to finish.");
       return;
     }
 
@@ -210,8 +224,12 @@ export function EditProfileModal() {
       handleClose();
       router.refresh();
     } catch (err: any) {
-      console.error(err);
-      setError(err?.response?.data || "Failed to update profile.");
+      console.error("[PROFILE_SAVE_ERROR]", err);
+      const serverMessage =
+        typeof err?.response?.data === "string"
+          ? err.response.data
+          : err?.response?.data?.message || err?.message || "Failed to update profile.";
+      setError(serverMessage);
       setIsLoading(false);
     }
   };
@@ -289,10 +307,10 @@ export function EditProfileModal() {
                   }`}
                   title="Click or drag image to upload avatar"
                 >
-                  {imageUrl ? (
+                  {previewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={imageUrl}
+                      src={previewUrl}
                       alt="Avatar"
                       className="h-full w-full object-cover rounded-full"
                     />
@@ -359,12 +377,12 @@ export function EditProfileModal() {
                   Image URL
                 </Button>
 
-                {imageUrl && (
+                {previewUrl && (
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    onClick={() => setImageUrl("")}
+                    onClick={handleResetAvatar}
                     className="h-7 text-xs rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 px-2"
                     title="Remove custom photo"
                   >
@@ -402,12 +420,12 @@ export function EditProfileModal() {
               </span>
               <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
                 {AVATAR_PRESETS.map((preset) => {
-                  const isSelected = imageUrl === preset.url;
+                  const isSelected = previewUrl === preset.url;
                   return (
                     <button
                       key={preset.id}
                       type="button"
-                      onClick={() => setImageUrl(preset.url)}
+                      onClick={() => handleSelectPreset(preset.url)}
                       className={`relative h-10 w-10 shrink-0 rounded-full overflow-hidden border-2 transition-all ${
                         isSelected
                           ? "border-indigo-500 ring-2 ring-indigo-500/50 scale-105"
