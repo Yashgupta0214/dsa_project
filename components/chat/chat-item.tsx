@@ -10,6 +10,7 @@ import {
   Trash,
   Copy,
   Check,
+  CheckCheck,
   Reply,
   Pin,
   Clock
@@ -51,6 +52,9 @@ interface ChatItemProps {
   pinned?: boolean;
   pinnedAt?: string | null;
   pinExpiresAt?: string | null;
+  seen?: boolean;
+  seenAt?: string | null;
+  isDirectMessage?: boolean;
 }
 
 const roleIconMap = {
@@ -118,13 +122,18 @@ export function ChatItem({
   socketQuery,
   pinned = false,
   pinnedAt = null,
-  pinExpiresAt = null
+  pinExpiresAt = null,
+  seen = false,
+  seenAt = null,
+  isDirectMessage
 }: ChatItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const { onOpen } = useModal();
 
   const params = useParams();
   const router = useRouter();
+
+  const isDM = isDirectMessage ?? (Boolean(socketUrl && socketUrl.includes("direct-messages")));
 
   const isPinnedActive = Boolean(
     pinned &&
@@ -315,6 +324,32 @@ export function ChatItem({
             <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
               {timestamp}
             </span>
+            {/* WhatsApp / Discord style Seen Status for Direct Messages */}
+            {isDM && isOwner && !deleted && (
+              <div className="flex items-center ml-0.5">
+                {seen ? (
+                  <ActionTooltip
+                    label={
+                      seenAt
+                        ? `Seen • ${format(new Date(seenAt), "MMM d, yyyy 'at' h:mm a")}`
+                        : "Seen by recipient"
+                    }
+                  >
+                    <span className="inline-flex items-center gap-x-1 px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-500 dark:text-sky-400 font-semibold text-[10px] tracking-tight cursor-default select-none animate-in fade-in duration-200">
+                      <CheckCheck className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 stroke-[2.5]" />
+                      <span>Seen</span>
+                    </span>
+                  </ActionTooltip>
+                ) : (
+                  <ActionTooltip label="Sent • Delivered">
+                    <span className="inline-flex items-center gap-x-0.5 px-1 py-0.5 text-zinc-400 dark:text-zinc-500 font-normal text-[10px] cursor-default select-none">
+                      <Check className="w-2.5 h-2.5 stroke-[2]" />
+                      <span>Sent</span>
+                    </span>
+                  </ActionTooltip>
+                )}
+              </div>
+            )}
             {isPinnedActive && (
               <ActionTooltip
                 label={

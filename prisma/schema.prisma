@@ -138,6 +138,8 @@ model DirectMessage {
   pinned         Boolean      @default(false)
   pinnedAt       DateTime?
   pinExpiresAt   DateTime?
+  seen           Boolean      @default(false)
+  seenAt         DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   member         Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -147,6 +149,7 @@ model DirectMessage {
   @@index([conversationId])
   @@index([conversationId, createdAt])
   @@index([conversationId, pinned])
+  @@index([conversationId, seen])
 }
 
 enum MemberRole {

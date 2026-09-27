@@ -27,10 +27,29 @@ export const useChatSocket = ({
   useEffect(() => {
     if (!socket) return;
 
-    socket.on(updateKey, (message: MessageWithMemberWithProfile) => {
+    socket.on(updateKey, (message: any) => {
       queryClient.setQueryData([queryKey], (oldData: any) => {
         if (!oldData || !oldData.pages || oldData.pages.length === 0) {
           return oldData;
+        }
+
+        // Handle bulk seen update
+        if (message?.type === "SEEN_ALL") {
+          const newData = oldData.pages.map((page: any) => {
+            return {
+              ...page,
+              items: page.items.map((item: any) => ({
+                ...item,
+                seen: true,
+                seenAt: message.seenAt || new Date().toISOString()
+              }))
+            };
+          });
+
+          return {
+            ...oldData,
+            pages: newData
+          };
         }
 
         const newData = oldData.pages.map((page: any) => {

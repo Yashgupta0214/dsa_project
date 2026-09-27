@@ -1,10 +1,11 @@
 "use client";
 
-import React, { Fragment, useRef, ElementRef } from "react";
+import React, { Fragment, useRef, ElementRef, useEffect } from "react";
 import { Member, Message, Profile } from "@prisma/client";
 import { ServerCrash } from "lucide-react";
 import { GradientLoader } from "@/components/ui/loader";
 import { format } from "date-fns";
+import axios from "axios";
 
 import { ChatWelcome } from "@/components/chat/chat-welcome";
 import { ChatItem } from "@/components/chat/chat-item";
@@ -70,6 +71,33 @@ export function ChatMessages({
     count: data?.pages?.[0]?.items?.length ?? 0
   });
 
+  // Automatically mark unread direct messages as seen when the conversation is active
+  useEffect(() => {
+    if (type !== "conversation" || !chatId) return;
+
+    const hasUnread = data?.pages?.some((page: any) =>
+      page?.items?.some(
+        (m: any) =>
+          (m.memberId ? m.memberId !== member.id : m.member?.id !== member.id) &&
+          !m.seen
+      )
+    );
+
+    if (hasUnread) {
+      axios
+        .post("/api/socket/direct-messages/seen", {
+          conversationId: chatId
+        })
+        .catch(() => {
+          axios
+            .post("/api/direct-messages/seen", {
+              conversationId: chatId
+            })
+            .catch((err) => console.error("[SEEN_TRIGGER_ERROR]", err));
+        });
+    }
+  }, [type, chatId, data, member.id]);
+
   if (status === "loading")
     return (
       <div className="flex flex-col flex-1 justify-center items-center">
@@ -133,6 +161,9 @@ export function ChatMessages({
                 pinned={(message as any).pinned}
                 pinnedAt={(message as any).pinnedAt}
                 pinExpiresAt={(message as any).pinExpiresAt}
+                seen={(message as any).seen}
+                seenAt={(message as any).seenAt}
+                isDirectMessage={type === "conversation" || socketUrl.includes("direct-messages")}
               />
             ))}
           </Fragment>
