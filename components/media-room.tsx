@@ -252,6 +252,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   // Remote WebRTC Participants Map
   const [remoteParticipants, setRemoteParticipants] = useState<Map<string, PeerParticipant>>(new Map());
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map());
   const pendingIceCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
@@ -308,32 +309,53 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     }
     const combined = localStreamRef.current;
 
-    // Add audio track
     const currentAudioStream = audioStreamRef.current;
     const currentCameraStream = cameraStreamRef.current;
     const currentMediaState = currentMediaStateRef.current;
 
+    const audioTracks = combined.getAudioTracks();
+    audioTracks.forEach((track) => combined.removeTrack(track));
+
     if (currentAudioStream) {
       const audioTrack = currentAudioStream.getAudioTracks()[0];
       if (audioTrack && !combined.getAudioTracks().includes(audioTrack)) {
-        combined.getAudioTracks().forEach((t) => combined.removeTrack(t));
         combined.addTrack(audioTrack);
       }
     }
 
-    // Add video track
+    const videoTracks = combined.getVideoTracks();
+    videoTracks.forEach((track) => combined.removeTrack(track));
+
     if (currentCameraStream && !currentMediaState.isVideoOff) {
       const videoTrack = currentCameraStream.getVideoTracks()[0];
       if (videoTrack && !combined.getVideoTracks().includes(videoTrack)) {
-        combined.getVideoTracks().forEach((t) => combined.removeTrack(t));
         combined.addTrack(videoTrack);
       }
-    } else if (currentMediaState.isVideoOff) {
-      combined.getVideoTracks().forEach((t) => combined.removeTrack(t));
     }
 
     return combined;
   }, []);
+
+  const syncTracksToPeerConnection = useCallback((pc: RTCPeerConnection, stream: MediaStream) => {
+    const currentTracks = stream.getTracks();
+    const senders = pc.getSenders();
+
+    currentTracks.forEach((track) => {
+      const hasMatchingSender = senders.some((sender) => sender.track?.id === track.id);
+      if (!hasMatchingSender) {
+        pc.addTrack(track, stream);
+      }
+    });
+  }, []);
+
+  const refreshLocalMediaForPeers = useCallback(() => {
+    const localStream = getCombinedLocalStream();
+    if (!localStream.getTracks().length) return;
+
+    peerConnectionsRef.current.forEach((pc) => {
+      syncTracksToPeerConnection(pc, localStream);
+    });
+  }, [getCombinedLocalStream, syncTracksToPeerConnection]);
 
   const syncAudioTrackToPeers = useCallback((stream: MediaStream | null) => {
     const audioTrack = stream?.getAudioTracks()[0] || null;
@@ -376,6 +398,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       setAudioStream(aStream);
       audioStreamRef.current = aStream;
       syncAudioTrackToPeers(aStream);
+      refreshLocalMediaForPeers();
 
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContextClass) {
@@ -413,6 +436,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       cameraStreamRef.current = vStream;
       setIsVideoOff(false);
       syncVideoTrackToPeers(vStream);
+      refreshLocalMediaForPeers();
       setMediaPermissionMessage("");
     } catch (e) {
       console.log("Webcam permission notice:", e);
@@ -537,9 +561,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
 
     // 1. Add all local tracks (Microphone + Camera) to the connection
     const combined = getCombinedLocalStream();
-    combined.getTracks().forEach((track) => {
-      pc.addTrack(track, combined);
-    });
+    syncTracksToPeerConnection(pc, combined);
 
     // 2. Handle ICE Candidates
     pc.onicecandidate = (event) => {
@@ -557,17 +579,21 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     };
 
     // 3. Handle incoming remote stream tracks
-    const remoteStream = new MediaStream();
+    const remoteStream = remoteStreamsRef.current.get(targetSocketId) ?? new MediaStream();
     pc.ontrack = (event) => {
-      const incomingTracks = event.streams[0]?.getTracks().length
+      const incomingTracks = event.streams && event.streams[0]?.getTracks().length
         ? event.streams[0].getTracks()
-        : [event.track];
+        : event.track
+        ? [event.track]
+        : [];
 
       incomingTracks.forEach((track) => {
         if (!remoteStream.getTracks().includes(track)) {
           remoteStream.addTrack(track);
         }
       });
+
+      remoteStreamsRef.current.set(targetSocketId, remoteStream);
 
       setRemoteParticipants((prev) => {
         const next = new Map(prev);
@@ -576,7 +602,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
           user: participantUser,
           mediaState: participantMedia,
         };
-        next.set(targetSocketId, { ...existing, stream: remoteStream });
+        next.set(targetSocketId, { ...existing, stream: remoteStream, connectionState: pc.connectionState });
         return next;
       });
     };
@@ -601,6 +627,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
 
       if (pc.connectionState === "closed") {
         peerConnectionsRef.current.delete(targetSocketId);
+        remoteStreamsRef.current.delete(targetSocketId);
       }
     };
 
@@ -636,6 +663,8 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         // Initiate WebRTC connection to existing participant
         createPeerConnection(p.socketId, p.user, p.mediaState, true);
       });
+
+      refreshLocalMediaForPeers();
     };
 
     // 2. New user joined after us
@@ -652,6 +681,10 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         return next;
       });
 
+        if (data.socketId && data.socketId !== socket.id) {
+        createPeerConnection(data.socketId, data.user, data.mediaState, true);
+        refreshLocalMediaForPeers();
+      }
     };
 
     // 3. Handle WebRTC signals (Offers, Answers, ICE Candidates)
@@ -745,6 +778,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         pc.close();
         peerConnectionsRef.current.delete(data.socketId);
       }
+      remoteStreamsRef.current.delete(data.socketId);
       pendingIceCandidatesRef.current.delete(data.socketId);
     };
 
@@ -796,6 +830,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       audioStream.getAudioTracks().forEach((t) => (t.enabled = !nextMuted));
     }
     setIsMuted(nextMuted);
+    refreshLocalMediaForPeers();
     broadcastMediaState(nextMuted, isVideoOff, isScreenSharing);
   };
 
@@ -815,6 +850,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         setMediaPermissionMessage("");
 
         syncVideoTrackToPeers(stream);
+        refreshLocalMediaForPeers();
 
         broadcastMediaState(isMuted, false, isScreenSharing);
       } catch (err) {
@@ -828,6 +864,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       setIsVideoOff(true);
 
       syncVideoTrackToPeers(null);
+      refreshLocalMediaForPeers();
 
       broadcastMediaState(isMuted, true, isScreenSharing);
     }
