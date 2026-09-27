@@ -107,17 +107,47 @@ function RemoteParticipantTile({
   const hasVideoStream = Boolean(
     participant.stream &&
     participant.stream.getVideoTracks().length > 0 &&
-    participant.stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live") &&
+    participant.stream.getVideoTracks().some((t) => t.readyState === "live") &&
     !participant.mediaState.isVideoOff
   );
 
-  // Video attachment
+  // Video attachment and playback
   useEffect(() => {
-    if (videoRef.current && participant.stream) {
-      videoRef.current.srcObject = participant.stream;
-      videoRef.current.play().catch(() => {});
+    const videoElement = videoRef.current;
+    if (!videoElement || !participant.stream) return;
+
+    if (videoElement.srcObject !== participant.stream) {
+      videoElement.srcObject = participant.stream;
     }
-  }, [participant.stream, hasVideoStream]);
+
+    const playVideo = () => {
+      videoElement.play().catch((err) => {
+        console.log("Remote video play notice:", err);
+      });
+    };
+
+    playVideo();
+
+    const handleTrack = () => {
+      if (videoElement) {
+        videoElement.srcObject = null;
+        videoElement.srcObject = participant.stream!;
+        playVideo();
+      }
+    };
+
+    participant.stream.addEventListener("addtrack", handleTrack);
+    participant.stream.getVideoTracks().forEach((track) => {
+      track.addEventListener("unmute", playVideo);
+    });
+
+    return () => {
+      participant.stream?.removeEventListener("addtrack", handleTrack);
+      participant.stream?.getVideoTracks().forEach((track) => {
+        track.removeEventListener("unmute", playVideo);
+      });
+    };
+  }, [participant.stream, hasVideoStream, participant.mediaState.isVideoOff]);
 
   // Audio attachment and playback with resilient track change handling
   useEffect(() => {
@@ -126,11 +156,14 @@ function RemoteParticipantTile({
 
     audioElement.srcObject = participant.stream;
     audioElement.muted = isDeafened;
+    audioElement.volume = 1.0;
 
     const playAudio = () => {
-      audioElement.play().catch((err) => {
-        console.log("Remote audio autoplay note:", err);
-      });
+      if (audioElement.srcObject) {
+        audioElement.play().catch((err) => {
+          console.log("Remote audio autoplay note:", err);
+        });
+      }
     };
 
     playAudio();
@@ -332,45 +365,13 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     cameraStreamRef.current = cameraStream;
   }, [cameraStream]);
 
-  // Combine local audio + camera tracks into a master local stream
-  const getCombinedLocalStream = useCallback(() => {
-    if (!localStreamRef.current) {
-      localStreamRef.current = new MediaStream();
-    }
-    const combined = localStreamRef.current;
-
-    // Add audio track
-    const currentAudioStream = audioStreamRef.current;
-    const currentCameraStream = cameraStreamRef.current;
-    const currentMediaState = currentMediaStateRef.current;
-
-    if (currentAudioStream) {
-      const audioTrack = currentAudioStream.getAudioTracks()[0];
-      if (audioTrack && !combined.getAudioTracks().includes(audioTrack)) {
-        combined.getAudioTracks().forEach((t) => combined.removeTrack(t));
-        combined.addTrack(audioTrack);
-      }
-    }
-
-    // Add video track
-    if (currentCameraStream && !currentMediaState.isVideoOff) {
-      const videoTrack = currentCameraStream.getVideoTracks()[0];
-      if (videoTrack && !combined.getVideoTracks().includes(videoTrack)) {
-        combined.getVideoTracks().forEach((t) => combined.removeTrack(t));
-        combined.addTrack(videoTrack);
-      }
-    } else if (currentMediaState.isVideoOff) {
-      combined.getVideoTracks().forEach((t) => combined.removeTrack(t));
-    }
-
-    return combined;
-  }, []);
-
   const syncAudioTrackToPeers = useCallback((stream: MediaStream | null) => {
     const audioTrack = stream?.getAudioTracks()[0] || null;
 
     peerConnectionsRef.current.forEach((pc) => {
-      const audioSender = pc.getSenders().find((sender) => sender.track?.kind === "audio");
+      const transceivers = pc.getTransceivers();
+      const audioTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "audio" || t.sender?.track?.kind === "audio");
+      const audioSender = audioTransceiver?.sender || pc.getSenders().find((sender) => sender.track?.kind === "audio");
 
       if (audioSender) {
         audioSender.replaceTrack(audioTrack).catch((err) => console.error("Error replacing audio track:", err));
@@ -384,7 +385,9 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     const videoTrack = stream?.getVideoTracks()[0] || null;
 
     peerConnectionsRef.current.forEach((pc) => {
-      const videoSender = pc.getSenders().find((sender) => sender.track?.kind === "video");
+      const transceivers = pc.getTransceivers();
+      const videoTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "video" || t.sender?.track?.kind === "video");
+      const videoSender = videoTransceiver?.sender || pc.getSenders().find((sender) => sender.track?.kind === "video");
 
       if (videoSender) {
         videoSender.replaceTrack(videoTrack).catch((err) => console.error("Error replacing video track:", err));
@@ -554,21 +557,24 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     const pc = new RTCPeerConnection(rtcConfig);
     peerConnectionsRef.current.set(targetSocketId, pc);
 
-    // 1. Attach local audio & video tracks directly so offerer and answerer pair cleanly without transceiver collision
-    const currentAudio = audioStreamRef.current;
-    const currentCamera = cameraStreamRef.current;
-    const currentMediaState = currentMediaStateRef.current;
+    // If initiator, add transceivers so initial SDP includes audio & video negotiation channels
+    if (isInitiator) {
+      const audioTransceiver = pc.addTransceiver("audio", { direction: "sendrecv" });
+      const videoTransceiver = pc.addTransceiver("video", { direction: "sendrecv" });
 
-    if (currentAudio) {
-      currentAudio.getAudioTracks().forEach((track) => {
-        pc.addTrack(track, currentAudio);
-      });
-    }
+      const currentAudio = audioStreamRef.current;
+      const currentCamera = cameraStreamRef.current;
+      const currentMediaState = currentMediaStateRef.current;
 
-    if (currentCamera && !currentMediaState.isVideoOff) {
-      currentCamera.getVideoTracks().forEach((track) => {
-        pc.addTrack(track, currentCamera);
-      });
+      const audioTrack = currentAudio?.getAudioTracks()[0];
+      const videoTrack = currentCamera?.getVideoTracks()[0];
+
+      if (audioTrack) {
+        audioTransceiver.sender.replaceTrack(audioTrack).catch(() => {});
+      }
+      if (videoTrack && !currentMediaState.isVideoOff) {
+        videoTransceiver.sender.replaceTrack(videoTrack).catch(() => {});
+      }
     }
 
     let isNegotiating = false;
@@ -669,7 +675,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     }
 
     return pc;
-  }, [socket, getCombinedLocalStream]);
+  }, [socket]);
 
   // Connect to the room when user clicks "Join"
   useEffect(() => {
@@ -738,6 +744,33 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         try {
           await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
           await flushPendingCandidates(pc);
+
+          // Answerer attaches local audio and video tracks to the negotiated transceivers
+          const transceivers = pc.getTransceivers();
+          const audioTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "audio" || t.mid === "0");
+          const videoTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "video" || t.mid === "1");
+
+          const currentAudio = audioStreamRef.current;
+          const currentCamera = cameraStreamRef.current;
+          const currentMedia = currentMediaStateRef.current;
+
+          const audioTrack = currentAudio?.getAudioTracks()[0];
+          const videoTrack = currentCamera?.getVideoTracks()[0];
+
+          if (audioTransceiver) {
+            audioTransceiver.direction = "sendrecv";
+            if (audioTrack) {
+              await audioTransceiver.sender.replaceTrack(audioTrack);
+            }
+          }
+
+          if (videoTransceiver) {
+            videoTransceiver.direction = "sendrecv";
+            if (videoTrack && !currentMedia.isVideoOff) {
+              await videoTransceiver.sender.replaceTrack(videoTrack);
+            }
+          }
+
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
 
@@ -785,7 +818,11 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         const next = new Map(prev);
         const existing = next.get(data.socketId);
         if (existing) {
-          next.set(data.socketId, { ...existing, mediaState: data.mediaState });
+          next.set(data.socketId, {
+            ...existing,
+            mediaState: data.mediaState,
+            stream: existing.stream ? new MediaStream(existing.stream.getTracks()) : undefined,
+          });
         }
         return next;
       });
