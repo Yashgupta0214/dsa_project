@@ -554,25 +554,21 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     const pc = new RTCPeerConnection(rtcConfig);
     peerConnectionsRef.current.set(targetSocketId, pc);
 
-    // 1. Add Transceivers to guarantee bidirectional audio and video channels in SDP
-    const audioTransceiver = pc.addTransceiver("audio", { direction: "sendrecv" });
-    const videoTransceiver = pc.addTransceiver("video", { direction: "sendrecv" });
+    // 1. Attach local audio & video tracks directly so offerer and answerer pair cleanly without transceiver collision
+    const currentAudio = audioStreamRef.current;
+    const currentCamera = cameraStreamRef.current;
+    const currentMediaState = currentMediaStateRef.current;
 
-    // 2. Attach local audio & video tracks
-    const combined = getCombinedLocalStream();
-    const audioTrack = combined.getAudioTracks()[0];
-    const videoTrack = combined.getVideoTracks()[0];
-
-    if (audioTrack && audioTransceiver.sender) {
-      audioTransceiver.sender.replaceTrack(audioTrack).catch(() => {});
-    } else if (audioTrack) {
-      pc.addTrack(audioTrack, combined);
+    if (currentAudio) {
+      currentAudio.getAudioTracks().forEach((track) => {
+        pc.addTrack(track, currentAudio);
+      });
     }
 
-    if (videoTrack && videoTransceiver.sender) {
-      videoTransceiver.sender.replaceTrack(videoTrack).catch(() => {});
-    } else if (videoTrack) {
-      pc.addTrack(videoTrack, combined);
+    if (currentCamera && !currentMediaState.isVideoOff) {
+      currentCamera.getVideoTracks().forEach((track) => {
+        pc.addTrack(track, currentCamera);
+      });
     }
 
     let isNegotiating = false;
@@ -597,7 +593,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       }
     };
 
-    // 3. Handle ICE Candidates
+    // 2. Handle ICE Candidates
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         socket.emit("call:signal", {
