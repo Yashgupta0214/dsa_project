@@ -51,6 +51,7 @@ model Member {
   directMessages         DirectMessage[]
   conversationsInitiated Conversation[]  @relation("MemberOne")
   conversationsReceived  Conversation[]  @relation("MemberTwo")
+  readReceipts           MessageReadReceipt[]
 
   @@index([profileId])
   @@index([serverId])
@@ -95,24 +96,39 @@ model Webhook {
 }
 
 model Message {
-  id           String    @id @default(uuid())
-  content      String    @db.LongText
-  fileUrl      String?   @db.LongText
+  id           String               @id @default(uuid())
+  content      String               @db.LongText
+  fileUrl      String?              @db.LongText
   memberId     String
   channelId    String
-  deleted      Boolean   @default(false)
-  pinned       Boolean   @default(false)
+  deleted      Boolean              @default(false)
+  pinned       Boolean              @default(false)
   pinnedAt     DateTime?
   pinExpiresAt DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  member       Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  channel      Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  member       Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  channel      Channel              @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  readReceipts MessageReadReceipt[]
 
   @@index([channelId])
   @@index([memberId])
   @@index([channelId, createdAt])
   @@index([channelId, pinned])
+}
+
+model MessageReadReceipt {
+  id        String   @id @default(uuid())
+  messageId String
+  memberId  String
+  readAt    DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  member  Member  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, memberId])
+  @@index([messageId])
+  @@index([memberId])
 }
 
 model Conversation {

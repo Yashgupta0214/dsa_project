@@ -19,6 +19,7 @@ import { EditProfileModal } from "@/components/modals/edit-profile-modal";
 import { UserSettingsModal } from "@/components/modals/user-settings-modal";
 import { PinMessageModal } from "@/components/modals/pin-message-modal";
 import { IncomingCallModal } from "@/components/modals/incoming-call-modal";
+import { MessageSeenModal } from "@/components/modals/message-seen-modal";
 
 export function ModalProvider() {
   const [isMounted, setIsMounted] = useState(false);
@@ -32,6 +33,7 @@ export function ModalProvider() {
   return (
     <>
       <IncomingCallModal />
+      <MessageSeenModal />
       <CreateServerModal />
       <InviteModal />
       <EditServerModal />

@@ -71,32 +71,56 @@ export function ChatMessages({
     count: data?.pages?.[0]?.items?.length ?? 0
   });
 
-  // Automatically mark unread direct messages as seen when the conversation is active
+  // Automatically mark unread messages as seen when chat/channel is active
   useEffect(() => {
-    if (type !== "conversation" || !chatId) return;
+    if (!chatId || !member?.id) return;
 
-    const hasUnread = data?.pages?.some((page: any) =>
-      page?.items?.some(
-        (m: any) =>
-          (m.memberId ? m.memberId !== member.id : m.member?.id !== member.id) &&
-          !m.seen
-      )
-    );
+    if (type === "conversation") {
+      const hasUnread = data?.pages?.some((page: any) =>
+        page?.items?.some(
+          (m: any) =>
+            (m.memberId ? m.memberId !== member.id : m.member?.id !== member.id) &&
+            !m.seen
+        )
+      );
 
-    if (hasUnread) {
-      axios
-        .post("/api/socket/direct-messages/seen", {
-          conversationId: chatId
-        })
-        .catch(() => {
-          axios
-            .post("/api/direct-messages/seen", {
-              conversationId: chatId
-            })
-            .catch((err) => console.error("[SEEN_TRIGGER_ERROR]", err));
-        });
+      if (hasUnread) {
+        axios
+          .post("/api/socket/direct-messages/seen", {
+            conversationId: chatId
+          })
+          .catch(() => {
+            axios
+              .post("/api/direct-messages/seen", {
+                conversationId: chatId
+              })
+              .catch((err) => console.error("[SEEN_TRIGGER_ERROR]", err));
+          });
+      }
+    } else if (type === "channel") {
+      const hasUnread = data?.pages?.some((page: any) =>
+        page?.items?.some(
+          (m: any) =>
+            (m.memberId ? m.memberId !== member.id : m.member?.id !== member.id) &&
+            !m.readReceipts?.some((r: any) => r.memberId === member.id)
+        )
+      );
+
+      if (hasUnread) {
+        axios
+          .post("/api/socket/messages/seen", {
+            channelId: chatId
+          })
+          .catch(() => {
+            axios
+              .post("/api/messages/seen", {
+                channelId: chatId
+              })
+              .catch((err) => console.error("[CHANNEL_SEEN_TRIGGER_ERROR]", err));
+          });
+      }
     }
-  }, [type, chatId, data, member.id]);
+  }, [type, chatId, data, member?.id]);
 
   if (status === "loading")
     return (
@@ -163,6 +187,7 @@ export function ChatMessages({
                 pinExpiresAt={(message as any).pinExpiresAt}
                 seen={(message as any).seen}
                 seenAt={(message as any).seenAt}
+                readReceipts={(message as any).readReceipts}
                 isDirectMessage={type === "conversation" || socketUrl.includes("direct-messages")}
               />
             ))}

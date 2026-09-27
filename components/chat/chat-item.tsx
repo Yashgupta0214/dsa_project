@@ -55,6 +55,17 @@ interface ChatItemProps {
   seen?: boolean;
   seenAt?: string | null;
   isDirectMessage?: boolean;
+  readReceipts?: Array<{
+    memberId: string;
+    readAt: string | Date;
+    member?: {
+      role?: string;
+      profile?: {
+        name?: string;
+        imageUrl?: string;
+      };
+    };
+  }>;
 }
 
 const roleIconMap = {
@@ -125,7 +136,8 @@ export function ChatItem({
   pinExpiresAt = null,
   seen = false,
   seenAt = null,
-  isDirectMessage
+  isDirectMessage,
+  readReceipts = []
 }: ChatItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const { onOpen } = useModal();
@@ -137,6 +149,23 @@ export function ChatItem({
     isDirectMessage ??
     (Boolean(params?.memberId) ||
       Boolean(socketUrl && socketUrl.includes("direct-messages")));
+
+  const onSeenClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onOpen("messageSeenBy", {
+      seenData: {
+        messageId: id,
+        content: mainContent || (fileUrl ? (fileUrl.split(".").pop() === "pdf" ? "PDF Document" : "Attachment") : ""),
+        timestamp,
+        isDM,
+        seen,
+        seenAt,
+        recipientName: isDM ? member?.profile?.name : undefined,
+        recipientAvatar: isDM ? member?.profile?.imageUrl : undefined,
+        readReceipts: readReceipts || []
+      }
+    });
+  };
 
   const isPinnedActive = Boolean(
     pinned &&
@@ -327,29 +356,66 @@ export function ChatItem({
             <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
               {timestamp}
             </span>
-            {/* WhatsApp / Discord style Seen Status for Direct Messages */}
-            {isDM && isOwner && !deleted && (
+            {/* WhatsApp / Discord style Seen Status with Interactive "Seen By" Click */}
+            {isOwner && !deleted && (
               <div className="flex items-center ml-1">
-                {seen ? (
-                  <ActionTooltip
-                    label={
-                      seenAt
-                        ? `Seen by recipient on ${format(new Date(seenAt), "MMM d, yyyy 'at' h:mm a")}`
-                        : "Seen by recipient"
-                    }
-                  >
-                    <span className="inline-flex items-center gap-x-1 px-2 py-0.5 rounded-full bg-sky-500/20 dark:bg-sky-400/20 border border-sky-500/30 text-sky-600 dark:text-sky-300 font-bold text-[10px] tracking-tight cursor-help select-none shadow-sm shadow-sky-500/10 animate-in fade-in zoom-in-95 duration-200">
-                      <CheckCheck className="w-3.5 h-3.5 text-sky-600 dark:text-sky-300 stroke-[2.5]" />
-                      <span>✓ Seen</span>
-                    </span>
-                  </ActionTooltip>
+                {isDM ? (
+                  seen ? (
+                    <ActionTooltip
+                      label={
+                        seenAt
+                          ? `Seen • ${format(new Date(seenAt), "h:mm a")} (Click to view details)`
+                          : "Seen • Click to view details"
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={onSeenClick}
+                        className="inline-flex items-center gap-x-1 px-2 py-0.5 rounded-full bg-sky-500/20 dark:bg-sky-400/20 border border-sky-500/30 text-sky-600 dark:text-sky-300 font-bold text-[10px] tracking-tight hover:bg-sky-500/30 hover:scale-105 active:scale-95 transition cursor-pointer select-none shadow-sm shadow-sky-500/10"
+                      >
+                        <CheckCheck className="w-3.5 h-3.5 text-sky-600 dark:text-sky-300 stroke-[2.5]" />
+                        <span>✓ Seen</span>
+                      </button>
+                    </ActionTooltip>
+                  ) : (
+                    <ActionTooltip label="Sent • Delivered (Click to view info)">
+                      <button
+                        type="button"
+                        onClick={onSeenClick}
+                        className="inline-flex items-center gap-x-1 px-1.5 py-0.5 rounded-md bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 font-medium text-[10px] hover:bg-zinc-500/20 hover:scale-105 active:scale-95 transition cursor-pointer select-none"
+                      >
+                        <Check className="w-2.5 h-2.5 stroke-[2]" />
+                        <span>Sent</span>
+                      </button>
+                    </ActionTooltip>
+                  )
                 ) : (
-                  <ActionTooltip label="Sent • Delivered to recipient (Unread)">
-                    <span className="inline-flex items-center gap-x-1 px-1.5 py-0.5 rounded-md bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 font-medium text-[10px] cursor-help select-none">
-                      <Check className="w-2.5 h-2.5 stroke-[2]" />
-                      <span>Sent</span>
-                    </span>
-                  </ActionTooltip>
+                  /* Channel Messages Seen Status */
+                  readReceipts && readReceipts.length > 0 ? (
+                    <ActionTooltip
+                      label={`Seen by ${readReceipts.length} member${readReceipts.length === 1 ? "" : "s"} • Click to see who read`}
+                    >
+                      <button
+                        type="button"
+                        onClick={onSeenClick}
+                        className="inline-flex items-center gap-x-1 px-2 py-0.5 rounded-full bg-sky-500/20 dark:bg-sky-400/20 border border-sky-500/30 text-sky-600 dark:text-sky-300 font-bold text-[10px] tracking-tight hover:bg-sky-500/30 hover:scale-105 active:scale-95 transition cursor-pointer select-none shadow-sm shadow-sky-500/10"
+                      >
+                        <CheckCheck className="w-3.5 h-3.5 text-sky-600 dark:text-sky-300 stroke-[2.5]" />
+                        <span>✓ Seen ({readReceipts.length})</span>
+                      </button>
+                    </ActionTooltip>
+                  ) : (
+                    <ActionTooltip label="Sent to channel • Click to see read receipts">
+                      <button
+                        type="button"
+                        onClick={onSeenClick}
+                        className="inline-flex items-center gap-x-1 px-1.5 py-0.5 rounded-md bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 font-medium text-[10px] hover:bg-zinc-500/20 hover:scale-105 active:scale-95 transition cursor-pointer select-none"
+                      >
+                        <Check className="w-2.5 h-2.5 stroke-[2]" />
+                        <span>Sent</span>
+                      </button>
+                    </ActionTooltip>
+                  )
                 )}
               </div>
             )}

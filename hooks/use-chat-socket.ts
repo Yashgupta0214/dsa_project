@@ -33,7 +33,7 @@ export const useChatSocket = ({
           return oldData;
         }
 
-        // Handle bulk seen update
+        // Handle bulk direct message seen update
         if (message?.type === "SEEN_ALL") {
           const newData = oldData.pages.map((page: any) => {
             return {
@@ -43,6 +43,38 @@ export const useChatSocket = ({
                 seen: true,
                 seenAt: message.seenAt || new Date().toISOString()
               }))
+            };
+          });
+
+          return {
+            ...oldData,
+            pages: newData
+          };
+        }
+
+        // Handle channel messages read receipts update
+        if (message?.type === "CHANNEL_MESSAGES_READ") {
+          const messageIdSet = new Set(message.messageIds || []);
+          const newReceipt = message.readReceipt;
+
+          const newData = oldData.pages.map((page: any) => {
+            return {
+              ...page,
+              items: page.items.map((item: any) => {
+                if (messageIdSet.has(item.id)) {
+                  const existing = item.readReceipts || [];
+                  const alreadyHas = existing.some(
+                    (r: any) => r.memberId === newReceipt.memberId
+                  );
+                  if (!alreadyHas) {
+                    return {
+                      ...item,
+                      readReceipts: [...existing, newReceipt]
+                    };
+                  }
+                }
+                return item;
+              })
             };
           });
 

@@ -17,7 +17,8 @@ export type ModalType =
   | "joinServer"
   | "searchServers"
   | "editProfile"
-  | "userSettings";
+  | "userSettings"
+  | "messageSeenBy";
 
 interface ModalData {
   server?: Server;
@@ -41,6 +42,27 @@ interface ModalData {
     pinned?: boolean;
     pinnedAt?: string | null;
     pinExpiresAt?: string | null;
+  };
+  seenData?: {
+    messageId: string;
+    content: string;
+    timestamp: string;
+    isDM: boolean;
+    seen?: boolean;
+    seenAt?: string | null;
+    recipientName?: string;
+    recipientAvatar?: string;
+    readReceipts?: Array<{
+      memberId: string;
+      readAt: string | Date;
+      member?: {
+        role?: string;
+        profile?: {
+          name?: string;
+          imageUrl?: string;
+        };
+      };
+    }>;
   };
   socketUrl?: string;
   socketQuery?: Record<string, string>;
