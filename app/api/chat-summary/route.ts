@@ -11,18 +11,39 @@ interface MessageItem {
   senderAvatar?: string;
 }
 
-// Built-in intelligent conversation analysis & summarizer
-function generateIntelligentSummary(messages: MessageItem[], channelOrChatName: string) {
+function cleanMessageText(rawContent: string, fileUrl?: string | null): string {
+  if (!rawContent && fileUrl) {
+    const isPDF = fileUrl.endsWith(".pdf");
+    return isPDF ? "shared a PDF document" : "shared an image / attachment";
+  }
+
+  if (!rawContent) return "";
+
+  let cleaned = rawContent;
+
+  // Remove [reply:{...}] prefix
+  cleaned = cleaned.replace(/^\[reply:\{.*?\}\]\n?/, "");
+
+  // Remove > Replying to @Name: "..." prefix
+  cleaned = cleaned.replace(/^> Replying to @.*?: ".*?"\n?/, "");
+
+  // If content is just a file path
+  if (cleaned.startsWith("/uploads/") || cleaned.startsWith("http") && (cleaned.endsWith(".pdf") || cleaned.endsWith(".png") || cleaned.endsWith(".jpg"))) {
+    return "shared an attachment file";
+  }
+
+  // Remove bot/webhook markup noise
+  cleaned = cleaned.replace(/\*\*\[BOT\].*?\*\*/g, "").trim();
+
+  return cleaned.trim();
+}
+
+function generateCleanSummary(messages: MessageItem[], chatName: string) {
   if (!messages || messages.length === 0) {
     return {
-      headline: `No messages in #${channelOrChatName}`,
-      summary: "There are no recent messages in this conversation to summarize.",
-      keyPoints: [],
-      topicBreakdown: [],
-      actionItems: [],
-      participantContributions: [],
-      totalMessages: 0,
-      timeRange: "N/A"
+      title: `Summary for #${chatName}`,
+      summaryPoints: ["All caught up! No recent messages to summarize."],
+      totalMessages: 0
     };
   }
 
@@ -31,135 +52,45 @@ function generateIntelligentSummary(messages: MessageItem[], channelOrChatName: 
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
 
-  const startTime = new Date(sorted[0].createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const endTime = new Date(sorted[sorted.length - 1].createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const startDate = new Date(sorted[0].createdAt).toLocaleDateString([], { month: "short", day: "numeric" });
-  const timeRange = `${startDate} (${startTime} - ${endTime})`;
-
-  // Track participant metrics & messages
-  const userMap = new Map<string, { name: string; avatar?: string; messages: string[]; filesCount: number }>();
+  // Group messages by sender
+  const userMessages = new Map<string, string[]>();
 
   sorted.forEach((msg) => {
-    const existing = userMap.get(msg.senderName) || {
-      name: msg.senderName,
-      avatar: msg.senderAvatar,
-      messages: [],
-      filesCount: 0
-    };
-    if (msg.content?.trim()) {
-      existing.messages.push(msg.content.trim());
-    }
-    if (msg.fileUrl) {
-      existing.filesCount += 1;
-    }
-    userMap.set(msg.senderName, existing);
+    const text = cleanMessageText(msg.content, msg.fileUrl);
+    if (!text) return;
+
+    const list = userMessages.get(msg.senderName) || [];
+    list.push(text);
+    userMessages.set(msg.senderName, list);
   });
 
-  const participantsList = Array.from(userMap.values());
-  const participantNames = participantsList.map((p) => p.name);
+  const summaryPoints: string[] = [];
 
-  // Extract action items, questions, decisions, and links
-  const actionItems: string[] = [];
-  const keyPoints: string[] = [];
-  const linksShared: string[] = [];
+  // Create clear, natural bullet points for what each person talked about
+  userMessages.forEach((msgs, sender) => {
+    // Filter out very short greetings like "hii", "Hyy", "hhiiiii" into a clean recap if they have real messages
+    const meaningful = msgs.filter((m) => m.length > 5 && !/^(hi+|hy+|hey+|hello+|test(ing)?)$/i.test(m));
 
-  const actionKeywords = ["todo", "will do", "let's", "lets", "please", "can you", "should we", "need to", "action", "meeting", "call", "fix", "deploy", "update", "working on", "assigned"];
-  const decisionKeywords = ["decided", "agreed", "done", "fixed", "completed", "approved", "confirmed", "resolved", "merged"];
-
-  sorted.forEach((msg) => {
-    const text = msg.content || "";
-    const lower = text.toLowerCase();
-
-    // Check for links
-    const urlMatch = text.match(/https?:\/\/[^\s]+/g);
-    if (urlMatch) {
-      urlMatch.forEach((url) => {
-        if (!linksShared.includes(url)) linksShared.push(url);
-      });
-    }
-
-    // Check for Action Items & Decisions
-    if (actionKeywords.some((k) => lower.includes(k))) {
-      const cleaned = text.length > 120 ? text.slice(0, 117) + "..." : text;
-      actionItems.push(`**${msg.senderName}**: ${cleaned}`);
-    } else if (decisionKeywords.some((k) => lower.includes(k))) {
-      const cleaned = text.length > 120 ? text.slice(0, 117) + "..." : text;
-      actionItems.push(`✅ **${msg.senderName}** noted: ${cleaned}`);
-    }
-
-    // Key Highlights (messages with high substance or length)
-    if (text.length > 30 || text.includes("?") || text.includes("!")) {
-      if (keyPoints.length < 8) {
-        keyPoints.push(`**${msg.senderName}**: "${text.length > 110 ? text.slice(0, 107) + "..." : text}"`);
-      }
+    if (meaningful.length > 0) {
+      // Pick the top meaningful notes
+      const sample = meaningful.slice(-2).join("; ");
+      const truncated = sample.length > 130 ? sample.slice(0, 127) + "..." : sample;
+      summaryPoints.push(`**${sender}**: ${truncated}`);
+    } else {
+      summaryPoints.push(`**${sender}**: Active in chat (${msgs.length} message${msgs.length === 1 ? "" : "s"}).`);
     }
   });
 
-  // Generate Executive Summary
-  let summaryText = "";
-  if (participantsList.length === 1) {
-    summaryText = `**${participantNames[0]}** posted ${sorted.length} message${sorted.length === 1 ? "" : "s"} covering recent updates and conversation topics in #${channelOrChatName}.`;
-  } else {
-    const topSpeakers = participantsList
-      .sort((a, b) => b.messages.length - a.messages.length)
-      .slice(0, 3)
-      .map((p) => `**${p.name}**`)
-      .join(", ");
-
-    summaryText = `A discussion took place between ${topSpeakers}${participantsList.length > 3 ? ` and ${participantsList.length - 3} others` : ""} covering ${sorted.length} messages. Key conversations centered around ongoing tasks, updates, and collaborative exchanges.`;
+  // Limit to top 5 concise points
+  const points = summaryPoints.slice(0, 5);
+  if (points.length === 0) {
+    points.push(`Recent messages exchanged between ${Array.from(userMessages.keys()).join(", ")}.`);
   }
-
-  // Topic Breakdown
-  const topicBreakdown: Array<{ topic: string; description: string; participants: string[] }> = [];
-
-  // Group messages by conversational clusters
-  const chunkSize = Math.max(3, Math.ceil(sorted.length / 3));
-  for (let i = 0; i < sorted.length; i += chunkSize) {
-    const chunk = sorted.slice(i, i + chunkSize);
-    const chunkParticipants = Array.from(new Set(chunk.map((m) => m.senderName)));
-    const sampleMessages = chunk
-      .map((m) => m.content)
-      .filter(Boolean)
-      .slice(0, 3)
-      .join(" • ");
-
-    const topicTitle =
-      i === 0
-        ? "Initial Discussion & Overview"
-        : i + chunkSize >= sorted.length
-        ? "Recent Updates & Concluding Remarks"
-        : "Main Discussion & Collaboration";
-
-    topicBreakdown.push({
-      topic: topicTitle,
-      description: sampleMessages.length > 180 ? sampleMessages.slice(0, 177) + "..." : sampleMessages || "Shared updates and reactions.",
-      participants: chunkParticipants
-    });
-  }
-
-  // Individual Participant Contributions
-  const participantContributions = participantsList.map((p) => {
-    const latestMsg = p.messages[p.messages.length - 1] || "Active in chat";
-    const sample = latestMsg.length > 80 ? latestMsg.slice(0, 77) + "..." : latestMsg;
-
-    return {
-      name: p.name,
-      avatar: p.avatar,
-      messageCount: p.messages.length + p.filesCount,
-      summary: `Contributed ${p.messages.length} message${p.messages.length === 1 ? "" : "s"}${p.filesCount > 0 ? ` and ${p.filesCount} file(s)` : ""}. Last said: "${sample}"`
-    };
-  });
 
   return {
-    headline: `Catch-Up Summary for #${channelOrChatName}`,
-    summary: summaryText,
-    keyPoints: keyPoints.slice(0, 6),
-    topicBreakdown,
-    actionItems: actionItems.slice(0, 6),
-    linksShared: linksShared.slice(0, 5),
-    participantContributions,
-    totalMessages: sorted.length,
-    timeRange
+    title: `Summary for #${chatName}`,
+    summaryPoints: points,
+    totalMessages: sorted.length
   };
 }
 
@@ -171,7 +102,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { channelId, conversationId, limit = 50, timeframe = "all" } = body || {};
+    const { channelId, conversationId } = body || {};
 
     if (!channelId && !conversationId) {
       return new NextResponse("Channel ID or Conversation ID required", { status: 400 });
@@ -187,23 +118,12 @@ export async function POST(req: Request) {
       });
       chatName = channel?.name || "channel";
 
-      const takeCount = Math.min(Number(limit) || 50, 100);
-
-      // Date filtering if requested
-      let createdAtFilter: any = undefined;
-      if (timeframe === "1h") {
-        createdAtFilter = { gte: new Date(Date.now() - 60 * 60 * 1000) };
-      } else if (timeframe === "today" || timeframe === "24h") {
-        createdAtFilter = { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) };
-      }
-
       const dbMessages = await db.message.findMany({
         where: {
           channelId,
-          deleted: false,
-          ...(createdAtFilter ? { createdAt: createdAtFilter } : {})
+          deleted: false
         },
-        take: takeCount,
+        take: 30,
         orderBy: { createdAt: "desc" },
         include: {
           member: {
@@ -240,14 +160,12 @@ export async function POST(req: Request) {
 
       chatName = otherMember?.profile?.name || "Direct Message";
 
-      const takeCount = Math.min(Number(limit) || 50, 100);
-
       const dbDMs = await db.directMessage.findMany({
         where: {
           conversationId,
           deleted: false
         },
-        take: takeCount,
+        take: 30,
         orderBy: { createdAt: "desc" },
         include: {
           member: {
@@ -268,8 +186,7 @@ export async function POST(req: Request) {
       }));
     }
 
-    // Generate comprehensive summary
-    const summaryData = generateIntelligentSummary(rawMessages, chatName);
+    const summaryData = generateCleanSummary(rawMessages, chatName);
 
     return NextResponse.json(summaryData);
   } catch (error) {
