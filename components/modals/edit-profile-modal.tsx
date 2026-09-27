@@ -140,7 +140,7 @@ export function EditProfileModal() {
         const img = new window.Image();
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          const maxDimension = 256;
+          const maxDimension = 160;
           let { width, height } = img;
           if (width > height) {
             if (width > maxDimension) {
@@ -161,7 +161,7 @@ export function EditProfileModal() {
             return;
           }
           ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL("image/webp", 0.85);
+          const dataUrl = canvas.toDataURL("image/webp", 0.75);
           resolve(dataUrl);
         };
         img.onerror = () => resolve(e.target?.result as string);
