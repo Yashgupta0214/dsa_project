@@ -14,6 +14,7 @@ import { MessageSquare, Bell, Volume2, X, ExternalLink, AtSign } from "lucide-re
 import { useSocket } from "@/components/providers/socket-provider";
 import { playNotificationSound, playMentionSound } from "@/lib/notification-sound";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { useUnreadStore } from "@/hooks/use-unread-store";
 
 export type NotificationPayload = {
   id: string;
@@ -88,6 +89,16 @@ export function NotificationProvider({
     }
   }, []);
 
+  // Clear unread count for the active server whenever user navigates to it
+  useEffect(() => {
+    if (pathname) {
+      const match = pathname.match(/\/servers\/([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        useUnreadStore.getState().clearUnread(match[1]);
+      }
+    }
+  }, [pathname]);
+
   const setSoundEnabled = (enabled: boolean) => {
     setSoundEnabledState(enabled);
     localStorage.setItem("discord_sound_enabled", String(enabled));
@@ -120,6 +131,14 @@ export function NotificationProvider({
     const handleNewMessageNotification = (payload: NotificationPayload) => {
       // Don't notify the sender themselves
       if (payload.senderId === userId) return;
+
+      // Track unread message count for servers if user is not currently in that server
+      if (payload.serverId) {
+        const isCurrentServer = pathname?.includes(`/servers/${payload.serverId}`);
+        if (!isCurrentServer) {
+          useUnreadStore.getState().incrementUnread(payload.serverId);
+        }
+      }
 
       // If it's a DM, only notify the intended recipient
       if (payload.type === "direct_message" && payload.recipientId && payload.recipientId !== userId) {
