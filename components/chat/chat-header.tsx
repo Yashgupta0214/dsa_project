@@ -6,6 +6,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { SocketIndicatior } from "@/components/socket-indicatior";
 import { ChatVideoButton } from "@/components/chat/chat-video-button";
 import { PinnedMessagesPopover } from "@/components/chat/pinned-messages-popover";
+import { ChatSummaryButton } from "@/components/chat/chat-summary-button";
 
 interface ChatHeaderProps {
   serverId: string;
@@ -66,6 +67,13 @@ export function ChatHeader({
             otherProfileId={otherProfileId}
             otherMemberName={name}
             otherMemberAvatar={imageUrl}
+          />
+        )}
+        {chatId && (
+          <ChatSummaryButton
+            chatId={chatId}
+            name={name}
+            type={type}
           />
         )}
         {chatId && (
