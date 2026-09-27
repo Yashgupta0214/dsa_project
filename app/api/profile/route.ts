@@ -21,7 +21,7 @@ export async function PATCH(req: Request) {
       },
       data: {
         name: name.trim(),
-        ...(imageUrl && { imageUrl })
+        ...(imageUrl ? { imageUrl } : {})
       }
     });
 

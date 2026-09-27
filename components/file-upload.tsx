@@ -22,8 +22,17 @@ export function FileUpload({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
-  const fileType = value?.split(".").pop();
+  const isPdf = value?.toLowerCase().endsWith(".pdf") || value?.includes("application/pdf");
   const accept = endpoint === "serverImage" ? "image/*" : "image/*,.pdf";
+
+  const readFileAsDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
   const uploadFile = async (file?: File) => {
     if (!file) return;
@@ -32,6 +41,7 @@ export function FileUpload({
     setIsUploading(true);
 
     try {
+      // First attempt: Upload to /api/upload
       const formData = new FormData();
       formData.append("file", file);
       formData.append("endpoint", endpoint);
@@ -41,41 +51,61 @@ export function FileUpload({
         body: formData
       });
 
-      if (!response.ok) {
-        throw new Error(await response.text());
+      if (response.ok) {
+        const data = (await response.json()) as { url: string };
+        onChange(data.url);
+      } else {
+        // Fallback to Data URL for image if backend is unavailable
+        if (file.type.startsWith("image/")) {
+          const dataUrl = await readFileAsDataUrl(file);
+          onChange(dataUrl);
+        } else {
+          throw new Error(await response.text());
+        }
       }
-
-      const data = (await response.json()) as { url: string };
-      onChange(data.url);
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Upload failed. Try again."
-      );
+    } catch (err: any) {
+      console.warn("Upload fallback activated:", err);
+      if (file.type.startsWith("image/")) {
+        try {
+          const dataUrl = await readFileAsDataUrl(file);
+          onChange(dataUrl);
+        } catch {
+          setError("Failed to process image.");
+        }
+      } else {
+        setError(err instanceof Error ? err.message : "Upload failed. Try again.");
+      }
     } finally {
       setIsUploading(false);
       if (inputRef.current) inputRef.current.value = "";
     }
   };
 
-  if (value && fileType !== "pdf") {
+  if (value && !isPdf) {
     return (
-      <div className="relative h-20 w-20">
-        <Image fill src={value} alt="Upload" className="rounded-full" />
+      <div className="relative h-24 w-24 rounded-full overflow-hidden group ring-2 ring-indigo-500/40 shadow-lg">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={value}
+          alt="Upload preview"
+          className="h-full w-full object-cover rounded-full"
+        />
         <button
           onClick={() => onChange("")}
-          className="bg-rose-500 text-white p-1 rounded-full absolute top-0 right-0 shadow-sm"
+          className="bg-rose-500 hover:bg-rose-600 text-white p-1.5 rounded-full absolute top-1 right-1 shadow-md transition-transform hover:scale-110 z-10"
           type="button"
+          title="Remove image"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
     );
   }
 
-  if (value && fileType === "pdf") {
+  if (value && isPdf) {
     return (
-      <div className="relative mt-2 flex w-full max-w-sm items-center gap-x-3 rounded-lg border border-black/5 bg-zinc-100/70 p-3 pr-10 dark:border-white/10 dark:bg-white/[0.04]">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-indigo-500/10">
+      <div className="relative mt-2 flex w-full max-w-sm items-center gap-x-3 rounded-xl border border-black/10 bg-zinc-100/80 p-3.5 pr-10 dark:border-white/10 dark:bg-white/[0.04] shadow-sm">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10">
           <FileIcon className="h-6 w-6 fill-indigo-200 stroke-indigo-500" />
         </div>
         <div className="min-w-0 text-left">
@@ -103,7 +133,7 @@ export function FileUpload({
   }
 
   return (
-    <div className="w-full min-w-[280px]">
+    <div className="w-full">
       <button
         type="button"
         disabled={isUploading}
@@ -119,9 +149,9 @@ export function FileUpload({
           void uploadFile(event.dataTransfer.files?.[0]);
         }}
         className={cn(
-          "flex min-h-[224px] w-full flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300/60 bg-zinc-100/40 px-6 py-8 text-center transition dark:border-white/10 dark:bg-white/[0.03]",
-          "hover:border-indigo-500/70 hover:bg-indigo-500/5 disabled:cursor-not-allowed disabled:opacity-80",
-          isDragging && "border-indigo-500 bg-indigo-500/10"
+          "flex min-h-[160px] w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50/50 hover:bg-indigo-500/[0.03] p-6 text-center transition-all dark:bg-white/[0.02]",
+          "hover:border-indigo-500/70 disabled:cursor-not-allowed disabled:opacity-80",
+          isDragging && "border-indigo-500 bg-indigo-500/10 scale-[0.99]"
         )}
       >
         <input
@@ -131,19 +161,19 @@ export function FileUpload({
           className="hidden"
           onChange={(event) => void uploadFile(event.target.files?.[0])}
         />
-        <UploadCloud className="h-12 w-12 text-zinc-400" />
-        <span className="mt-4 text-sm font-semibold text-indigo-500">
-          {isUploading ? "Uploading..." : "Choose a file or drag it here"}
+        <div className="h-12 w-12 rounded-full bg-indigo-500/10 flex items-center justify-center mb-2">
+          <UploadCloud className="h-6 w-6 text-indigo-500" />
+        </div>
+        <span className="text-sm font-semibold text-indigo-500 dark:text-indigo-400">
+          {isUploading ? "Uploading..." : "Choose a photo or drag it here"}
         </span>
-        <span className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-          {endpoint === "serverImage" ? "IMAGE" : "IMAGE, PDF"} up to 4MB
+        <span className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+          {endpoint === "serverImage" ? "PNG, JPG, WEBP, GIF" : "IMAGE, PDF"} up to 10MB
         </span>
-        {isUploading && (
-          <GradientLoader className="mt-5 h-6 w-6" />
-        )}
+        {isUploading && <GradientLoader className="mt-4 h-5 w-5" />}
       </button>
       {error && (
-        <p className="mt-2 max-w-[280px] text-center text-xs font-medium text-rose-500">
+        <p className="mt-2 text-center text-xs font-medium text-rose-500">
           {error}
         </p>
       )}
