@@ -247,6 +247,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   // Remote WebRTC Participants Map
   const [remoteParticipants, setRemoteParticipants] = useState<Map<string, PeerParticipant>>(new Map());
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const pendingIceCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
 
   const [isMuted, setIsMuted] = useState(!audio);
@@ -256,6 +257,11 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   const [audioLevel, setAudioLevel] = useState(0);
   const [copiedLink, setCopiedLink] = useState(false);
   const [mediaPermissionMessage, setMediaPermissionMessage] = useState("");
+  const currentMediaStateRef = useRef({
+    isMuted: !audio,
+    isVideoOff: !video,
+    isScreenSharing: false,
+  });
 
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -270,6 +276,15 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   }, [serverId]);
 
   const userName = user?.fullName || user?.username || "You";
+  const userImageUrl = user?.imageUrl;
+
+  useEffect(() => {
+    currentMediaStateRef.current = {
+      isMuted,
+      isVideoOff,
+      isScreenSharing,
+    };
+  }, [isMuted, isVideoOff, isScreenSharing]);
 
   // Combine local audio + camera tracks into a master local stream
   const getCombinedLocalStream = useCallback(() => {
@@ -376,12 +391,16 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
 
   // Cleanup all media tracks on unmount
   useEffect(() => {
+    const peerConnections = peerConnectionsRef.current;
+    const pendingIceCandidates = pendingIceCandidatesRef.current;
+
     return () => {
       if (cameraStream) cameraStream.getTracks().forEach((t) => t.stop());
       if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
       if (audioStream) audioStream.getTracks().forEach((t) => t.stop());
-      peerConnectionsRef.current.forEach((pc) => pc.close());
-      peerConnectionsRef.current.clear();
+      peerConnections.forEach((pc) => pc.close());
+      peerConnections.clear();
+      pendingIceCandidates.clear();
     };
   }, [cameraStream, screenStream, audioStream]);
 
@@ -516,22 +535,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   useEffect(() => {
     if (!hasJoined || !socket || !user?.id) return;
 
-    const currentMediaState = {
-      isMuted,
-      isVideoOff,
-      isScreenSharing,
-    };
-
-    // Join room on socket
-    socket.emit("call:join_room", {
-      roomId: chatId,
-      user: {
-        id: user.id,
-        name: userName,
-        imageUrl: user.imageUrl,
-      },
-      mediaState: currentMediaState,
-    });
+    const currentMediaState = currentMediaStateRef.current;
 
     // 1. Existing participants received upon joining
     const handleAllParticipants = (participants: Array<{ socketId: string; user: any; mediaState: any }>) => {
@@ -562,12 +566,29 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         });
         return next;
       });
+
+      if (!peerConnectionsRef.current.has(data.socketId)) {
+        createPeerConnection(data.socketId, data.user, data.mediaState, false);
+      }
     };
 
     // 3. Handle WebRTC signals (Offers, Answers, ICE Candidates)
     const handleSignal = async (data: { from: string; signal: any; user: any; mediaState: any }) => {
       const { from, signal, user: senderUser, mediaState: senderMedia } = data;
       let pc = peerConnectionsRef.current.get(from);
+
+      const flushPendingCandidates = async (connection: RTCPeerConnection) => {
+        const queued = pendingIceCandidatesRef.current.get(from) || [];
+        pendingIceCandidatesRef.current.delete(from);
+
+        for (const candidate of queued) {
+          try {
+            await connection.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (e) {
+            console.error("Error adding queued ICE candidate:", e);
+          }
+        }
+      };
 
       if (signal.type === "offer") {
         if (!pc) {
@@ -576,6 +597,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
 
         try {
           await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          await flushPendingCandidates(pc);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
 
@@ -590,17 +612,29 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         if (pc) {
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+            await flushPendingCandidates(pc);
           } catch (e) {
             console.error("Error setting remote answer:", e);
           }
         }
       } else if (signal.type === "candidate") {
         if (pc) {
+          if (!pc.remoteDescription) {
+            const queued = pendingIceCandidatesRef.current.get(from) || [];
+            queued.push(signal.candidate);
+            pendingIceCandidatesRef.current.set(from, queued);
+            return;
+          }
+
           try {
             await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
           } catch (e) {
             console.error("Error adding ICE candidate:", e);
           }
+        } else {
+          const queued = pendingIceCandidatesRef.current.get(from) || [];
+          queued.push(signal.candidate);
+          pendingIceCandidatesRef.current.set(from, queued);
         }
       }
     };
@@ -629,6 +663,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         pc.close();
         peerConnectionsRef.current.delete(data.socketId);
       }
+      pendingIceCandidatesRef.current.delete(data.socketId);
     };
 
     socket.on("call:all_participants", handleAllParticipants);
@@ -636,6 +671,17 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
     socket.on("call:signal", handleSignal);
     socket.on("call:user_media_state", handleUserMediaState);
     socket.on("call:user_left", handleUserLeft);
+
+    // Join only after listeners are active; the server replies immediately.
+    socket.emit("call:join_room", {
+      roomId: chatId,
+      user: {
+        id: user.id,
+        name: userName,
+        imageUrl: userImageUrl,
+      },
+      mediaState: currentMediaState,
+    });
 
     return () => {
       socket.off("call:all_participants", handleAllParticipants);
@@ -645,7 +691,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       socket.off("call:user_left", handleUserLeft);
       socket.emit("call:leave_room", { roomId: chatId });
     };
-  }, [hasJoined, socket, user?.id, userName, chatId, createPeerConnection]);
+  }, [hasJoined, socket, user?.id, userName, userImageUrl, chatId, createPeerConnection]);
 
   // Update peers when our media state changes
   const broadcastMediaState = useCallback((newMuted: boolean, newVideoOff: boolean, newScreenSharing: boolean) => {
