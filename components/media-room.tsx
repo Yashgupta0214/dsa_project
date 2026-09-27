@@ -1353,6 +1353,9 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
             type="button"
             size="sm"
             onClick={() => {
+              if (socket) {
+                socket.emit("call:cancel", { conversationId: chatId });
+              }
               if (cameraStream) cameraStream.getTracks().forEach((t) => t.stop());
               if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
               if (audioStream) audioStream.getTracks().forEach((t) => t.stop());

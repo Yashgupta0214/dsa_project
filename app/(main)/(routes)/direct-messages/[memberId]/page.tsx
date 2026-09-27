@@ -32,8 +32,11 @@ export default async function DirectMessagePage({
       select: {
         id: true,
         serverId: true,
+        profileId: true,
         profile: {
           select: {
+            id: true,
+            userId: true,
             name: true,
             imageUrl: true
           }
@@ -79,6 +82,11 @@ export default async function DirectMessagePage({
           serverId={otherMember.serverId}
           type="conversation"
           chatId={conversation.id}
+          conversationId={conversation.id}
+          currentMemberId={currentMember.id}
+          otherMemberId={otherMember.id}
+          otherUserId={otherMember.profile.userId}
+          otherProfileId={otherMember.profile.id}
         />
         {video && <MediaRoom chatId={conversation.id} video audio />}
         {!video && (

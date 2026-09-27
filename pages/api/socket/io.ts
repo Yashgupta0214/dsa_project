@@ -54,6 +54,7 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
 
         const keysToRegister = [profileId, userId].filter(Boolean) as string[];
         keysToRegister.forEach((key) => {
+          socket.join(`user:${key}`);
           const current = onlineUsers.get(key) || { count: 0, status, customStatus, profileId, userId };
           current.count = (current.count || 0) + 1;
           current.status = status;
@@ -71,6 +72,14 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
           status,
           customStatus
         });
+      });
+
+      // Direct User Register
+      socket.on("user:register", (data: { profileId?: string; userId?: string }) => {
+        const { profileId, userId } = data || {};
+        if (profileId) socket.join(`user:${profileId}`);
+        if (userId) socket.join(`user:${userId}`);
+        socketToUser.set(socket.id, { profileId, userId });
       });
 
       // 3. Handle explicit presence / status update (e.g. online -> idle, dnd, invisible)
@@ -100,6 +109,37 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
       // 4. Request sync
       socket.on("presence:sync_request", () => {
         socket.emit("presence:sync", buildPresenceDictionary());
+      });
+
+      // =====================================================================
+      // Real-time Direct Calling Notifications & Signals
+      // =====================================================================
+      socket.on("call:initiate", (data: any) => {
+        if (!data) return;
+        // Forward to recipient's personal user room
+        if (data.recipient?.userId) {
+          io.to(`user:${data.recipient.userId}`).emit("call:incoming", data);
+        }
+        if (data.recipient?.profileId) {
+          io.to(`user:${data.recipient.profileId}`).emit("call:incoming", data);
+        }
+        // Broadcast as fail-safe (recipient filters by recipient.userId === currentUserId)
+        socket.broadcast.emit("call:incoming", data);
+      });
+
+      socket.on("call:cancel", (data: any) => {
+        if (!data) return;
+        io.emit("call:cancelled", data);
+      });
+
+      socket.on("call:decline", (data: any) => {
+        if (!data) return;
+        io.emit("call:declined", data);
+      });
+
+      socket.on("call:accept", (data: any) => {
+        if (!data) return;
+        io.emit("call:accepted", data);
       });
 
       // =====================================================================

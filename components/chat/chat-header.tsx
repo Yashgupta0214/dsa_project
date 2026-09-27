@@ -15,6 +15,11 @@ interface ChatHeaderProps {
   chatId?: string;
   socketUrl?: string;
   socketQuery?: Record<string, string>;
+  conversationId?: string;
+  currentMemberId?: string;
+  otherMemberId?: string;
+  otherUserId?: string;
+  otherProfileId?: string;
 }
 
 export function ChatHeader({
@@ -26,7 +31,12 @@ export function ChatHeader({
   socketUrl = type === "channel" ? "/api/socket/messages" : "/api/socket/direct-messages",
   socketQuery = type === "channel"
     ? { channelId: chatId || "", serverId }
-    : { conversationId: chatId || "" }
+    : { conversationId: chatId || "" },
+  conversationId,
+  currentMemberId,
+  otherMemberId,
+  otherUserId,
+  otherProfileId
 }: ChatHeaderProps) {
   return (
     <div className="text-md font-semibold mx-3 mt-3 mb-2 px-3.5 flex items-center h-12 rounded-xl border border-black/5 dark:border-white/10 bg-white/90 dark:bg-[#1b1d25]/75 backdrop-blur-xl sticky top-3 z-20 shadow-sm dark:shadow-black/25 transition-colors">
@@ -46,7 +56,18 @@ export function ChatHeader({
         {name}
       </p>
       <div className="ml-auto flex items-center gap-x-2">
-        {type === "conversation" && <ChatVideoButton />}
+        {type === "conversation" && (
+          <ChatVideoButton
+            conversationId={conversationId || chatId}
+            serverId={serverId}
+            currentMemberId={currentMemberId}
+            otherMemberId={otherMemberId}
+            otherUserId={otherUserId}
+            otherProfileId={otherProfileId}
+            otherMemberName={name}
+            otherMemberAvatar={imageUrl}
+          />
+        )}
         {chatId && (
           <PinnedMessagesPopover
             chatId={chatId}
