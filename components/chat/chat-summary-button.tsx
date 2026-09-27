@@ -29,7 +29,7 @@ interface ChatSummaryButtonProps {
 
 interface SummaryData {
   title: string;
-  summaryPoints: string[];
+  passage: string;
   totalMessages: number;
 }
 
@@ -66,13 +66,9 @@ export function ChatSummaryButton({ chatId, name, type }: ChatSummaryButtonProps
   };
 
   const handleCopySummary = () => {
-    if (!summaryData) return;
+    if (!summaryData?.passage) return;
 
-    let text = `✨ Chat Summary for #${name}\n\n`;
-    summaryData.summaryPoints.forEach((point) => {
-      text += `• ${point.replace(/\*\*/g, "")}\n`;
-    });
-
+    const text = `✨ Chat Summary for #${name}\n\n${summaryData.passage}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -105,22 +101,22 @@ export function ChatSummaryButton({ chatId, name, type }: ChatSummaryButtonProps
                 Chat Summary
               </DialogTitle>
               <DialogDescription className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Recent discussion in <strong className="text-indigo-500 dark:text-indigo-400">#{name}</strong>
+                Overview of discussions in <strong className="text-indigo-500 dark:text-indigo-400">#{name}</strong>
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        {/* Clean Body */}
+        {/* Clean Narrative Passage Body */}
         <div className="p-5">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-8 text-center space-y-2">
               <RefreshCw className="w-5 h-5 text-indigo-500 animate-spin" />
               <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                Summarizing recent messages...
+                Generating conversation summary...
               </p>
             </div>
-          ) : !summaryData || summaryData.summaryPoints.length === 0 ? (
+          ) : !summaryData || !summaryData.passage ? (
             <div className="flex flex-col items-center justify-center py-6 text-center space-y-2">
               <MessageSquare className="w-8 h-8 text-zinc-400 dark:text-zinc-600" />
               <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
@@ -130,23 +126,10 @@ export function ChatSummaryButton({ chatId, name, type }: ChatSummaryButtonProps
           ) : (
             <div className="space-y-3">
               <p className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-                What you missed:
+                Conversation Summary:
               </p>
-              <div className="space-y-2">
-                {summaryData.summaryPoints.map((point, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-100 dark:bg-white/[0.04] text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
-                    <span
-                      className="flex-1"
-                      dangerouslySetInnerHTML={{
-                        __html: point.replace(/\*\*(.*?)\*\*/g, '<strong class="text-zinc-900 dark:text-white font-semibold">$1</strong>')
-                      }}
-                    />
-                  </div>
-                ))}
+              <div className="p-4 rounded-xl bg-zinc-100 dark:bg-white/[0.04] border border-black/5 dark:border-white/5 text-xs text-zinc-800 dark:text-zinc-200 leading-relaxed font-normal">
+                {summaryData.passage}
               </div>
             </div>
           )}
@@ -155,7 +138,7 @@ export function ChatSummaryButton({ chatId, name, type }: ChatSummaryButtonProps
         {/* Simple Footer */}
         <div className="p-3.5 px-5 border-t border-black/5 dark:border-white/5 flex items-center justify-between bg-zinc-50/80 dark:bg-[#111214]/80">
           <span className="text-[11px] text-zinc-400">
-            {summaryData ? `${summaryData.totalMessages} messages checked` : ""}
+            {summaryData ? `${summaryData.totalMessages} messages analyzed` : ""}
           </span>
 
           <div className="flex items-center gap-2">

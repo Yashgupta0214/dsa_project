@@ -357,7 +357,7 @@ export function ChatItem({
               {timestamp}
             </span>
             {/* WhatsApp / Discord style Seen Status with Interactive "Seen By" Click */}
-            {isOwner && !deleted && (
+            {!deleted && (
               <div className="flex items-center ml-1">
                 {isDM ? (
                   seen ? (
