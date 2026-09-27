@@ -133,7 +133,10 @@ export function ChatItem({
   const params = useParams();
   const router = useRouter();
 
-  const isDM = isDirectMessage ?? (Boolean(socketUrl && socketUrl.includes("direct-messages")));
+  const isDM =
+    isDirectMessage ??
+    (Boolean(params?.memberId) ||
+      Boolean(socketUrl && socketUrl.includes("direct-messages")));
 
   const isPinnedActive = Boolean(
     pinned &&
@@ -326,23 +329,23 @@ export function ChatItem({
             </span>
             {/* WhatsApp / Discord style Seen Status for Direct Messages */}
             {isDM && isOwner && !deleted && (
-              <div className="flex items-center ml-0.5">
+              <div className="flex items-center ml-1">
                 {seen ? (
                   <ActionTooltip
                     label={
                       seenAt
-                        ? `Seen • ${format(new Date(seenAt), "MMM d, yyyy 'at' h:mm a")}`
+                        ? `Seen by recipient on ${format(new Date(seenAt), "MMM d, yyyy 'at' h:mm a")}`
                         : "Seen by recipient"
                     }
                   >
-                    <span className="inline-flex items-center gap-x-1 px-1.5 py-0.5 rounded-full bg-sky-500/15 text-sky-500 dark:text-sky-400 font-semibold text-[10px] tracking-tight cursor-default select-none animate-in fade-in duration-200">
-                      <CheckCheck className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400 stroke-[2.5]" />
-                      <span>Seen</span>
+                    <span className="inline-flex items-center gap-x-1 px-2 py-0.5 rounded-full bg-sky-500/20 dark:bg-sky-400/20 border border-sky-500/30 text-sky-600 dark:text-sky-300 font-bold text-[10px] tracking-tight cursor-help select-none shadow-sm shadow-sky-500/10 animate-in fade-in zoom-in-95 duration-200">
+                      <CheckCheck className="w-3.5 h-3.5 text-sky-600 dark:text-sky-300 stroke-[2.5]" />
+                      <span>✓ Seen</span>
                     </span>
                   </ActionTooltip>
                 ) : (
-                  <ActionTooltip label="Sent • Delivered">
-                    <span className="inline-flex items-center gap-x-0.5 px-1 py-0.5 text-zinc-400 dark:text-zinc-500 font-normal text-[10px] cursor-default select-none">
+                  <ActionTooltip label="Sent • Delivered to recipient (Unread)">
+                    <span className="inline-flex items-center gap-x-1 px-1.5 py-0.5 rounded-md bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 font-medium text-[10px] cursor-help select-none">
                       <Check className="w-2.5 h-2.5 stroke-[2]" />
                       <span>Sent</span>
                     </span>
