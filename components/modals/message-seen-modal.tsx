@@ -82,7 +82,7 @@ export function MessageSeenModal() {
             <span>Message</span>
           </p>
           <p className="text-xs text-zinc-700 dark:text-zinc-200 line-clamp-3 italic bg-zinc-100 dark:bg-white/[0.04] p-2.5 rounded-xl border border-black/5 dark:border-white/5">
-            "{content || "Attachment / File"}"
+            &quot;{content || "Attachment / File"}&quot;
           </p>
         </div>
 
@@ -129,7 +129,7 @@ export function MessageSeenModal() {
                   <Check className="w-6 h-6 text-zinc-400" />
                   <p className="text-xs font-semibold text-zinc-400">Delivered</p>
                   <p className="text-[11px] text-zinc-500">
-                    The recipient hasn't opened this message yet.
+                    The recipient hasn&apos;t opened this message yet.
                   </p>
                 </div>
               )
