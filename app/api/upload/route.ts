@@ -74,13 +74,26 @@ export async function POST(req: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
-    const fileName = `${randomUUID()}.${ext}`;
 
-    await mkdir(uploadDir, { recursive: true });
-    await writeFile(path.join(uploadDir, fileName), buffer);
+    // Try writing to public/uploads (works in local dev & standard servers)
+    try {
+      const uploadDir = path.join(process.cwd(), "public", "uploads");
+      const fileName = `${randomUUID()}.${ext}`;
 
-    return NextResponse.json({ url: `/uploads/${fileName}` });
+      await mkdir(uploadDir, { recursive: true });
+      await writeFile(path.join(uploadDir, fileName), buffer);
+
+      return NextResponse.json({ url: `/uploads/${fileName}` });
+    } catch (fsError) {
+      // In serverless environments (e.g. Vercel read-only filesystem /var/task),
+      // return a Data URL so upload succeeds seamlessly everywhere
+      console.warn("[UPLOAD_FS_FALLBACK] Serverless environment detected, returning Data URL:", fsError);
+      const mimeType = file.type || (isImage ? "image/jpeg" : "application/pdf");
+      const base64 = buffer.toString("base64");
+      const dataUrl = `data:${mimeType};base64,${base64}`;
+
+      return NextResponse.json({ url: dataUrl });
+    }
   } catch (error: any) {
     console.error("[UPLOAD_ERROR]", error);
     return new NextResponse(

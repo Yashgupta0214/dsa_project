@@ -133,6 +133,45 @@ export function EditProfileModal() {
     }, 100);
   };
 
+  const compressAvatarImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const maxDimension = 256;
+          let { width, height } = img;
+          if (width > height) {
+            if (width > maxDimension) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            }
+          } else {
+            if (height > maxDimension) {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(e.target?.result as string);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/webp", 0.85);
+          resolve(dataUrl);
+        };
+        img.onerror = () => resolve(e.target?.result as string);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileUpload = async (file?: File) => {
     if (!file) return;
 
@@ -140,11 +179,14 @@ export function EditProfileModal() {
     setIsUploading(true);
 
     try {
-      // 1. Instant local preview
-      const localPreview = URL.createObjectURL(file);
-      setPreviewUrl(localPreview);
+      // 1. Instant local preview & high quality client compression (~15KB)
+      const compressedDataUrl = await compressAvatarImage(file);
+      if (compressedDataUrl) {
+        setPreviewUrl(compressedDataUrl);
+        setImageUrl(compressedDataUrl);
+      }
 
-      // 2. Upload to server
+      // 2. Upload to server (if server filesystem is persistent)
       const formData = new FormData();
       formData.append("file", file);
       formData.append("endpoint", "serverImage");
@@ -154,19 +196,15 @@ export function EditProfileModal() {
         body: formData
       });
 
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || "Failed to upload image to server.");
-      }
-
-      const data = await res.json();
-      if (data.url) {
-        setImageUrl(data.url);
-        setPreviewUrl(data.url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          setImageUrl(data.url);
+          setPreviewUrl(data.url);
+        }
       }
     } catch (err: any) {
-      console.error("Upload failed:", err);
-      setError(err?.message || "Failed to upload photo. Try another image or use an image link.");
+      console.warn("Upload fallback activated:", err);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
