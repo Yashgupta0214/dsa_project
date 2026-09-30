@@ -7,6 +7,10 @@ import { db } from "@/lib/db";
 export default async function SetupPage() {
   const profile = await initialProfile();
 
+  if (!profile || !profile.id) {
+    return redirect("/sign-in");
+  }
+
   const server = await db.server.findFirst({
     where: {
       members: {

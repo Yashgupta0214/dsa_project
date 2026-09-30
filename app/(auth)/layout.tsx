@@ -37,7 +37,7 @@ export default function AuthLayout({
         </h1>
 
         <p className="text-zinc-400 text-base leading-relaxed">
-          Create servers, chat with markdown & custom emojis, hop into low-latency voice channels, and share your screen in crisp HD.
+          Chat with markdown & custom emojis, hop into low-latency voice channels, and share your screen in crisp HD.
         </p>
 
         {/* Feature Highlights Grid */}
