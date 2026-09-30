@@ -5,68 +5,55 @@ import { cn } from "@/lib/utils";
 
 interface TypingIndicatorProps {
   typingUsers?: Array<{ id: string; name: string }>;
-  isSelfTyping?: boolean;
   className?: string;
   variant?: "floating" | "header" | "inline";
 }
 
 export function TypingIndicator({
   typingUsers = [],
-  isSelfTyping = false,
   className,
   variant = "floating"
 }: TypingIndicatorProps) {
-  const hasOthersTyping = typingUsers.length > 0;
-  const isAnyTyping = hasOthersTyping || isSelfTyping;
-
-  if (!isAnyTyping) {
+  // Only show when other users are typing
+  if (!typingUsers || typingUsers.length === 0) {
     return null;
   }
 
   const renderTypingText = () => {
-    if (hasOthersTyping) {
-      const count = typingUsers.length;
+    const count = typingUsers.length;
 
-      if (count === 1) {
-        return (
-          <span className="truncate">
-            <strong className="font-bold text-zinc-900 dark:text-zinc-100">
-              {typingUsers[0].name}
-            </strong>{" "}
-            is <span className="text-emerald-500 dark:text-emerald-400 font-semibold italic">typing...</span>
-          </span>
-        );
-      }
-
-      if (count === 2) {
-        return (
-          <span className="truncate">
-            <strong className="font-bold text-zinc-900 dark:text-zinc-100">
-              {typingUsers[0].name}
-            </strong>{" "}
-            and{" "}
-            <strong className="font-bold text-zinc-900 dark:text-zinc-100">
-              {typingUsers[1].name}
-            </strong>{" "}
-            are <span className="text-emerald-500 dark:text-emerald-400 font-semibold italic">typing...</span>
-          </span>
-        );
-      }
-
+    if (count === 1) {
       return (
         <span className="truncate">
           <strong className="font-bold text-zinc-900 dark:text-zinc-100">
-            Several people
+            {typingUsers[0].name}
+          </strong>{" "}
+          is <span className="text-emerald-500 dark:text-emerald-400 font-semibold italic">typing...</span>
+        </span>
+      );
+    }
+
+    if (count === 2) {
+      return (
+        <span className="truncate">
+          <strong className="font-bold text-zinc-900 dark:text-zinc-100">
+            {typingUsers[0].name}
+          </strong>{" "}
+          and{" "}
+          <strong className="font-bold text-zinc-900 dark:text-zinc-100">
+            {typingUsers[1].name}
           </strong>{" "}
           are <span className="text-emerald-500 dark:text-emerald-400 font-semibold italic">typing...</span>
         </span>
       );
     }
 
-    // Local self-typing preview
     return (
-      <span className="truncate text-emerald-500 dark:text-emerald-400 font-semibold italic">
-        typing...
+      <span className="truncate">
+        <strong className="font-bold text-zinc-900 dark:text-zinc-100">
+          Several people
+        </strong>{" "}
+        are <span className="text-emerald-500 dark:text-emerald-400 font-semibold italic">typing...</span>
       </span>
     );
   };

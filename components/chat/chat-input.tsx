@@ -323,8 +323,8 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="px-3 pb-3 pt-0">
-        {/* Real-time Discord & WhatsApp Typing Indicator */}
-        <TypingIndicator typingUsers={typingUsers} isSelfTyping={isSelfTyping} />
+        {/* Real-time WhatsApp-style Typing Indicator (Visible to everyone else) */}
+        <TypingIndicator typingUsers={typingUsers} />
 
         <FormField
           control={form.control}
