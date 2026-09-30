@@ -14,6 +14,25 @@ export const config = {
 const onlineUsers = new Map<string, { status: string; customStatus?: string; count: number; profileId?: string; userId?: string }>();
 const socketToUser = new Map<string, { profileId?: string; userId?: string }>();
 
+// In-memory active chat viewers tracking: chatId -> Map<socketId, { id: string; name: string; imageUrl?: string }>
+const chatActiveViewers = new Map<string, Map<string, { id: string; name: string; imageUrl?: string }>>();
+const socketToChat = new Map<string, string>();
+
+function getChatActivePresence(chatId: string) {
+  const viewers = chatActiveViewers.get(chatId);
+  if (!viewers || viewers.size === 0) {
+    return { count: 1, users: [] };
+  }
+  const uniqueUsers = new Map<string, { id: string; name: string; imageUrl?: string }>();
+  viewers.forEach((user, sId) => {
+    uniqueUsers.set(user.id || sId, user);
+  });
+  return {
+    count: Math.max(1, uniqueUsers.size),
+    users: Array.from(uniqueUsers.values())
+  };
+}
+
 function buildPresenceDictionary(): Record<string, { status: string; customStatus?: string }> {
   const dict: Record<string, { status: string; customStatus?: string }> = {};
   onlineUsers.forEach((value, key) => {
@@ -109,6 +128,50 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
       // 4. Request sync
       socket.on("presence:sync_request", () => {
         socket.emit("presence:sync", buildPresenceDictionary());
+      });
+
+      // =====================================================================
+      // Real-time Active Chat Participants Tracking
+      // =====================================================================
+      socket.on("chat:view_join", (data: { chatId: string; user?: { id: string; name: string; imageUrl?: string } }) => {
+        if (!data?.chatId) return;
+        const { chatId, user } = data;
+
+        // If previously in another chat, leave that
+        const prevChat = socketToChat.get(socket.id);
+        if (prevChat && prevChat !== chatId) {
+          const prevViewers = chatActiveViewers.get(prevChat);
+          if (prevViewers) {
+            prevViewers.delete(socket.id);
+            if (prevViewers.size === 0) chatActiveViewers.delete(prevChat);
+          }
+          io.emit(`chat:${prevChat}:active_presence`, getChatActivePresence(prevChat));
+        }
+
+        socketToChat.set(socket.id, chatId);
+        if (!chatActiveViewers.has(chatId)) {
+          chatActiveViewers.set(chatId, new Map());
+        }
+        chatActiveViewers.get(chatId)!.set(socket.id, user || { id: socket.id, name: "User" });
+
+        io.emit(`chat:${chatId}:active_presence`, getChatActivePresence(chatId));
+      });
+
+      socket.on("chat:view_leave", (data: { chatId: string }) => {
+        if (!data?.chatId) return;
+        const { chatId } = data;
+        socketToChat.delete(socket.id);
+        const viewers = chatActiveViewers.get(chatId);
+        if (viewers) {
+          viewers.delete(socket.id);
+          if (viewers.size === 0) chatActiveViewers.delete(chatId);
+        }
+        io.emit(`chat:${chatId}:active_presence`, getChatActivePresence(chatId));
+      });
+
+      socket.on("chat:get_active", (data: { chatId: string }) => {
+        if (!data?.chatId) return;
+        socket.emit(`chat:${data.chatId}:active_presence`, getChatActivePresence(data.chatId));
       });
 
       // =====================================================================
@@ -249,6 +312,20 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
             socketId: socket.id,
             user: (socket as any).callUser
           });
+        }
+
+        // Clean up chat view presence
+        const activeChatId = socketToChat.get(socket.id);
+        if (activeChatId) {
+          socketToChat.delete(socket.id);
+          const viewers = chatActiveViewers.get(activeChatId);
+          if (viewers) {
+            viewers.delete(socket.id);
+            if (viewers.size === 0) {
+              chatActiveViewers.delete(activeChatId);
+            }
+          }
+          io.emit(`chat:${activeChatId}:active_presence`, getChatActivePresence(activeChatId));
         }
 
         const mapping = socketToUser.get(socket.id);
