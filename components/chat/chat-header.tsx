@@ -7,6 +7,7 @@ import { SocketIndicatior } from "@/components/socket-indicatior";
 import { ChatVideoButton } from "@/components/chat/chat-video-button";
 import { PinnedMessagesPopover } from "@/components/chat/pinned-messages-popover";
 import { ChatSummaryButton } from "@/components/chat/chat-summary-button";
+import { ChatSearch } from "@/components/chat/chat-search";
 import { ChatHeaderTitle } from "@/components/chat/chat-header-title";
 
 interface ChatHeaderProps {
@@ -70,16 +71,23 @@ export function ChatHeader({
             otherMemberAvatar={imageUrl}
           />
         )}
-        {chatId && (
-          <ChatSummaryButton
-            chatId={chatId}
+        {activeChatId && (
+          <ChatSearch
+            chatId={activeChatId}
             name={name}
             type={type}
           />
         )}
-        {chatId && (
+        {activeChatId && (
+          <ChatSummaryButton
+            chatId={activeChatId}
+            name={name}
+            type={type}
+          />
+        )}
+        {activeChatId && (
           <PinnedMessagesPopover
-            chatId={chatId}
+            chatId={activeChatId}
             type={type}
             socketUrl={socketUrl}
             socketQuery={socketQuery}
