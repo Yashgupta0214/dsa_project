@@ -6,15 +6,16 @@ import { cn } from "@/lib/utils";
 interface TypingIndicatorProps {
   typingUsers: Array<{ id: string; name: string }>;
   className?: string;
+  variant?: "floating" | "header" | "inline";
 }
 
-export function TypingIndicator({ typingUsers, className }: TypingIndicatorProps) {
+export function TypingIndicator({
+  typingUsers,
+  className,
+  variant = "floating"
+}: TypingIndicatorProps) {
   if (!typingUsers || typingUsers.length === 0) {
-    return (
-      <div className={cn("h-6 px-4 py-0.5 flex items-center opacity-0 pointer-events-none transition-opacity duration-150", className)}>
-        <span className="text-xs">&nbsp;</span>
-      </div>
-    );
+    return null;
   }
 
   const renderTypingText = () => {
@@ -22,83 +23,95 @@ export function TypingIndicator({ typingUsers, className }: TypingIndicatorProps
 
     if (count === 1) {
       return (
-        <span>
-          <strong className="font-bold text-zinc-900 dark:text-zinc-100">
+        <span className="truncate">
+          <strong className="font-semibold text-zinc-900 dark:text-zinc-100">
             {typingUsers[0].name}
           </strong>{" "}
-          is typing...
+          is <span className="text-emerald-500 dark:text-emerald-400 font-medium italic">typing...</span>
         </span>
       );
     }
 
     if (count === 2) {
       return (
-        <span>
-          <strong className="font-bold text-zinc-900 dark:text-zinc-100">
+        <span className="truncate">
+          <strong className="font-semibold text-zinc-900 dark:text-zinc-100">
             {typingUsers[0].name}
           </strong>{" "}
           and{" "}
-          <strong className="font-bold text-zinc-900 dark:text-zinc-100">
+          <strong className="font-semibold text-zinc-900 dark:text-zinc-100">
             {typingUsers[1].name}
           </strong>{" "}
-          are typing...
+          are <span className="text-emerald-500 dark:text-emerald-400 font-medium italic">typing...</span>
         </span>
       );
     }
 
     if (count === 3) {
       return (
-        <span>
-          <strong className="font-bold text-zinc-900 dark:text-zinc-100">
+        <span className="truncate">
+          <strong className="font-semibold text-zinc-900 dark:text-zinc-100">
             {typingUsers[0].name}
           </strong>
           ,{" "}
-          <strong className="font-bold text-zinc-900 dark:text-zinc-100">
+          <strong className="font-semibold text-zinc-900 dark:text-zinc-100">
             {typingUsers[1].name}
           </strong>{" "}
           and{" "}
-          <strong className="font-bold text-zinc-900 dark:text-zinc-100">
+          <strong className="font-semibold text-zinc-900 dark:text-zinc-100">
             {typingUsers[2].name}
           </strong>{" "}
-          are typing...
+          are <span className="text-emerald-500 dark:text-emerald-400 font-medium italic">typing...</span>
         </span>
       );
     }
 
     return (
-      <span>
-        <strong className="font-bold text-zinc-900 dark:text-zinc-100">
+      <span className="truncate">
+        <strong className="font-semibold text-zinc-900 dark:text-zinc-100">
           Several people
         </strong>{" "}
-        are typing...
+        are <span className="text-emerald-500 dark:text-emerald-400 font-medium italic">typing...</span>
       </span>
     );
   };
 
+  if (variant === "header") {
+    return (
+      <div className={cn("flex items-center gap-1.5 text-xs text-emerald-500 dark:text-emerald-400 font-medium animate-in fade-in duration-200", className)}>
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+        </span>
+        <span className="italic">{renderTypingText()}</span>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        "h-6 px-4 py-0.5 flex items-center gap-x-2 text-[12px] text-zinc-600 dark:text-zinc-400 select-none animate-in fade-in slide-in-from-bottom-1 duration-150",
+        "flex items-center gap-x-2 px-3 py-1 mb-1.5 w-fit max-w-[90%] rounded-full bg-zinc-100/90 dark:bg-[#18191c]/90 border border-emerald-500/25 dark:border-emerald-500/30 text-xs text-zinc-600 dark:text-zinc-300 shadow-md backdrop-blur-md select-none animate-in fade-in slide-in-from-bottom-2 duration-200",
         className
       )}
     >
-      {/* 3 Animated Bouncing Discord Dots */}
-      <div className="flex items-center gap-1 shrink-0">
+      {/* WhatsApp 3 Jumping Emerald Wave Dots */}
+      <div className="flex items-center gap-1 shrink-0 px-0.5">
         <span
-          className="w-1.5 h-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400 animate-bounce"
-          style={{ animationDuration: "1s", animationDelay: "0ms" }}
+          className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-bounce"
+          style={{ animationDuration: "0.8s", animationDelay: "0ms" }}
         />
         <span
-          className="w-1.5 h-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400 animate-bounce"
-          style={{ animationDuration: "1s", animationDelay: "180ms" }}
+          className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-bounce"
+          style={{ animationDuration: "0.8s", animationDelay: "150ms" }}
         />
         <span
-          className="w-1.5 h-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400 animate-bounce"
-          style={{ animationDuration: "1s", animationDelay: "360ms" }}
+          className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-bounce"
+          style={{ animationDuration: "0.8s", animationDelay: "300ms" }}
         />
       </div>
 
-      <div className="truncate min-w-0">{renderTypingText()}</div>
+      <div className="truncate min-w-0 pr-1">{renderTypingText()}</div>
     </div>
   );
 }

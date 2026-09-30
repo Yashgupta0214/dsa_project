@@ -13,7 +13,7 @@ export async function MobileToggle({ serverId }: { serverId: string }) {
 
   if (!profile) return null;
 
-  const server = await db.server.findUnique({
+  const server = await db.server.findFirst({
     where: {
       id: serverId,
       members: {
