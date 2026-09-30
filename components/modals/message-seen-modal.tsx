@@ -54,9 +54,9 @@ export function MessageSeenModal() {
 
   return (
     <Dialog open={isModalOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-white dark:bg-[#18191c] text-zinc-900 dark:text-zinc-100 p-0 overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 shadow-2xl max-w-md w-full">
+      <DialogContent className="bg-white dark:bg-[#18191c] text-zinc-900 dark:text-zinc-100 p-0 overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 shadow-2xl max-w-md w-full flex flex-col max-h-[85vh]">
         {/* Header */}
-        <DialogHeader className="p-5 pb-4 border-b border-black/5 dark:border-white/5 bg-zinc-50/80 dark:bg-[#111214]/80">
+        <DialogHeader className="p-5 pb-4 border-b border-black/5 dark:border-white/5 bg-zinc-50/80 dark:bg-[#111214]/80 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-sky-500/15 text-sky-500">
               <CheckCheck className="w-5 h-5 stroke-[2.5]" />
@@ -76,7 +76,7 @@ export function MessageSeenModal() {
         </DialogHeader>
 
         {/* Message Snippet Box */}
-        <div className="p-4 px-5 bg-black/[0.02] dark:bg-white/[0.02] border-b border-black/5 dark:border-white/5 text-left">
+        <div className="p-4 px-5 bg-black/[0.02] dark:bg-white/[0.02] border-b border-black/5 dark:border-white/5 text-left shrink-0">
           <p className="text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1">
             <MessageSquare className="w-3 h-3" />
             <span>Message</span>
@@ -87,8 +87,8 @@ export function MessageSeenModal() {
         </div>
 
         {/* Seen By List */}
-        <div className="p-5 text-left">
-          <div className="flex items-center justify-between mb-3">
+        <div className="p-5 text-left flex-1 min-h-0 flex flex-col">
+          <div className="flex items-center justify-between mb-3 shrink-0">
             <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-300">
               <Eye className="w-3.5 h-3.5 text-sky-500" />
               <span>Seen By ({readCount})</span>
@@ -100,7 +100,7 @@ export function MessageSeenModal() {
             )}
           </div>
 
-          <ScrollArea className="max-h-[240px] pr-2">
+          <ScrollArea className="max-h-[260px] pr-2 flex-1">
             {/* Direct Message Mode */}
             {isDM ? (
               seen ? (
@@ -186,7 +186,7 @@ export function MessageSeenModal() {
         </div>
 
         {/* Footer */}
-        <div className="p-3 px-5 border-t border-black/5 dark:border-white/5 flex items-center justify-end bg-zinc-50/80 dark:bg-[#111214]/80">
+        <div className="p-3 px-5 border-t border-black/5 dark:border-white/5 flex items-center justify-end bg-zinc-50/80 dark:bg-[#111214]/80 shrink-0">
           <Button
             type="button"
             size="sm"
