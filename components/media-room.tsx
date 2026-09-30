@@ -92,6 +92,32 @@ function getCameraErrorMessage(error: unknown) {
   return "Camera could not be opened. Check webcam permissions and try again.";
 }
 
+// Generate a lightweight dummy video track (16x16 black canvas, 1fps, disabled)
+// This enables WebRTC to pre-negotiate full-duplex "sendrecv" video transceivers
+// so toggling camera between audio/video uses instant replaceTrack without SDP renegotiation.
+function getDummyVideoTrack(): MediaStreamTrack | null {
+  if (typeof window === "undefined" || typeof document === "undefined") return null;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 16;
+    canvas.height = 16;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, 16, 16);
+    }
+    const stream = canvas.captureStream ? canvas.captureStream(1) : (canvas as any).mozCaptureStream?.(1);
+    const track = stream?.getVideoTracks()[0];
+    if (track) {
+      track.enabled = false;
+      return track;
+    }
+  } catch (e) {
+    console.error("Error creating dummy video track:", e);
+  }
+  return null;
+}
+
 // Remote Participant Video & Audio Tile Component
 function RemoteParticipantTile({
   participant,
@@ -111,7 +137,7 @@ function RemoteParticipantTile({
     !participant.mediaState.isVideoOff
   );
 
-  // Video attachment and playback
+  // Video attachment and playback (ALWAYS MUTED so browser autoplay policy never blocks it or halts audio)
   useEffect(() => {
     const videoElement = videoRef.current;
     if (!videoElement || !participant.stream) return;
@@ -119,47 +145,42 @@ function RemoteParticipantTile({
     if (videoElement.srcObject !== participant.stream) {
       videoElement.srcObject = participant.stream;
     }
+    videoElement.muted = true;
 
     const playVideo = () => {
-      videoElement.play().catch((err) => {
-        console.log("Remote video play notice:", err);
-      });
+      if (videoElement && videoElement.srcObject) {
+        videoElement.play().catch((err) => {
+          console.log("Remote video play notice:", err);
+        });
+      }
     };
 
     playVideo();
 
-    const handleTrack = () => {
-      if (videoElement) {
-        videoElement.srcObject = null;
-        videoElement.srcObject = participant.stream!;
-        playVideo();
-      }
-    };
-
-    participant.stream.addEventListener("addtrack", handleTrack);
     participant.stream.getVideoTracks().forEach((track) => {
       track.addEventListener("unmute", playVideo);
     });
 
     return () => {
-      participant.stream?.removeEventListener("addtrack", handleTrack);
       participant.stream?.getVideoTracks().forEach((track) => {
         track.removeEventListener("unmute", playVideo);
       });
     };
   }, [participant.stream, hasVideoStream, participant.mediaState.isVideoOff]);
 
-  // Audio attachment and playback with resilient track change handling
+  // Audio attachment and playback with resilient track handling
   useEffect(() => {
     const audioElement = audioRef.current;
     if (!audioElement || !participant.stream) return;
 
-    audioElement.srcObject = participant.stream;
+    if (audioElement.srcObject !== participant.stream) {
+      audioElement.srcObject = participant.stream;
+    }
     audioElement.muted = isDeafened;
     audioElement.volume = 1.0;
 
     const playAudio = () => {
-      if (audioElement.srcObject) {
+      if (audioElement && audioElement.srcObject) {
         audioElement.play().catch((err) => {
           console.log("Remote audio autoplay note:", err);
         });
@@ -168,19 +189,11 @@ function RemoteParticipantTile({
 
     playAudio();
 
-    const handleTrackAdded = () => {
-      audioElement.srcObject = null;
-      audioElement.srcObject = participant.stream!;
-      playAudio();
-    };
-
-    participant.stream.addEventListener("addtrack", handleTrackAdded);
     participant.stream.getAudioTracks().forEach((track) => {
       track.addEventListener("unmute", playAudio);
     });
 
     return () => {
-      participant.stream?.removeEventListener("addtrack", handleTrackAdded);
       participant.stream?.getAudioTracks().forEach((track) => {
         track.removeEventListener("unmute", playAudio);
       });
@@ -260,6 +273,7 @@ function RemoteParticipantTile({
           ref={videoRef}
           autoPlay
           playsInline
+          muted
           className="h-full w-full object-cover bg-black"
         />
       ) : (
@@ -320,6 +334,14 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   const localStreamRef = useRef<MediaStream | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
+  const dummyTrackRef = useRef<MediaStreamTrack | null>(null);
+
+  const getOrCreateDummyTrack = useCallback(() => {
+    if (!dummyTrackRef.current || dummyTrackRef.current.readyState === "ended") {
+      dummyTrackRef.current = getDummyVideoTrack();
+    }
+    return dummyTrackRef.current;
+  }, []);
 
   const [isMuted, setIsMuted] = useState(!audio);
   const [isVideoOff, setIsVideoOff] = useState(!video);
@@ -386,10 +408,15 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
 
     peerConnectionsRef.current.forEach((pc) => {
       const transceivers = pc.getTransceivers();
-      const videoTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "video" || t.sender?.track?.kind === "video");
+      const videoTransceiver = transceivers.find(
+        (t) => t.receiver?.track?.kind === "video" || t.sender?.track?.kind === "video" || t.mid === "1"
+      );
       const videoSender = videoTransceiver?.sender || pc.getSenders().find((sender) => sender.track?.kind === "video");
 
       if (videoSender) {
+        if (videoTransceiver && videoTransceiver.direction !== "sendrecv") {
+          videoTransceiver.direction = "sendrecv";
+        }
         videoSender.replaceTrack(videoTrack).catch((err) => console.error("Error replacing video track:", err));
       } else if (videoTrack && stream) {
         pc.addTrack(videoTrack, stream);
@@ -492,6 +519,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       if (cameraStream) cameraStream.getTracks().forEach((t) => t.stop());
       if (screenStream) screenStream.getTracks().forEach((t) => t.stop());
       if (audioStream) audioStream.getTracks().forEach((t) => t.stop());
+      if (dummyTrackRef.current) dummyTrackRef.current.stop();
       peerConnections.forEach((pc) => pc.close());
       peerConnections.clear();
       pendingIceCandidates.clear();
@@ -567,12 +595,14 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       const currentMediaState = currentMediaStateRef.current;
 
       const audioTrack = currentAudio?.getAudioTracks()[0];
-      const videoTrack = currentCamera?.getVideoTracks()[0];
+      const videoTrack = (!currentMediaState.isVideoOff && currentCamera)
+        ? currentCamera.getVideoTracks()[0]
+        : getOrCreateDummyTrack();
 
       if (audioTrack) {
         audioTransceiver.sender.replaceTrack(audioTrack).catch(() => {});
       }
-      if (videoTrack && !currentMediaState.isVideoOff) {
+      if (videoTrack) {
         videoTransceiver.sender.replaceTrack(videoTrack).catch(() => {});
       }
     }
@@ -748,14 +778,18 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
           // Answerer attaches local audio and video tracks to the negotiated transceivers
           const transceivers = pc.getTransceivers();
           const audioTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "audio" || t.mid === "0");
-          const videoTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "video" || t.mid === "1");
+          const videoTransceiver = transceivers.find(
+            (t) => t.receiver?.track?.kind === "video" || t.sender?.track?.kind === "video" || t.mid === "1"
+          );
 
           const currentAudio = audioStreamRef.current;
           const currentCamera = cameraStreamRef.current;
           const currentMedia = currentMediaStateRef.current;
 
           const audioTrack = currentAudio?.getAudioTracks()[0];
-          const videoTrack = currentCamera?.getVideoTracks()[0];
+          const videoTrack = (!currentMedia.isVideoOff && currentCamera)
+            ? currentCamera.getVideoTracks()[0]
+            : getOrCreateDummyTrack();
 
           if (audioTransceiver) {
             audioTransceiver.direction = "sendrecv";
@@ -766,7 +800,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
 
           if (videoTransceiver) {
             videoTransceiver.direction = "sendrecv";
-            if (videoTrack && !currentMedia.isVideoOff) {
+            if (videoTrack) {
               await videoTransceiver.sender.replaceTrack(videoTrack);
             }
           }
@@ -920,12 +954,15 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
         setMediaPermissionMessage(getCameraErrorMessage(err));
       }
     } else {
-      cameraStream.getTracks().forEach((t) => t.stop());
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((t) => t.stop());
+      }
       setCameraStream(null);
       cameraStreamRef.current = null;
       setIsVideoOff(true);
 
-      syncVideoTrackToPeers(null);
+      const dummyTrack = getOrCreateDummyTrack();
+      syncVideoTrackToPeers(dummyTrack ? new MediaStream([dummyTrack]) : null);
 
       broadcastMediaState(isMuted, true, isScreenSharing);
     }
@@ -938,6 +975,11 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
       setScreenStream(null);
       setIsScreenSharing(false);
       broadcastMediaState(isMuted, isVideoOff, false);
+
+      const restoreTrack = (!isVideoOff && cameraStreamRef.current)
+        ? cameraStreamRef.current
+        : (dummyTrackRef.current ? new MediaStream([dummyTrackRef.current]) : null);
+      syncVideoTrackToPeers(restoreTrack);
     } else {
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -947,6 +989,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
 
         setScreenStream(stream);
         setIsScreenSharing(true);
+        syncVideoTrackToPeers(stream);
         broadcastMediaState(isMuted, isVideoOff, true);
 
         const videoTrack = stream.getVideoTracks()[0];
@@ -955,6 +998,11 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
             setScreenStream(null);
             setIsScreenSharing(false);
             broadcastMediaState(isMuted, isVideoOff, false);
+
+            const restoreTrack = (!isVideoOff && cameraStreamRef.current)
+              ? cameraStreamRef.current
+              : (dummyTrackRef.current ? new MediaStream([dummyTrackRef.current]) : null);
+            syncVideoTrackToPeers(restoreTrack);
           };
         }
       } catch (err) {
