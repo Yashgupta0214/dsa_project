@@ -112,6 +112,33 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
       });
 
       // =====================================================================
+      // Real-time Chat Typing Indicators
+      // =====================================================================
+      socket.on("chat:typing_start", (data: { chatId: string; user: { id: string; name: string } }) => {
+        if (!data?.chatId || !data?.user) return;
+        socket.to(`chat:${data.chatId}`).emit(`chat:${data.chatId}:typing`, {
+          user: data.user,
+          isTyping: true
+        });
+        socket.broadcast.emit(`chat:${data.chatId}:typing`, {
+          user: data.user,
+          isTyping: true
+        });
+      });
+
+      socket.on("chat:typing_stop", (data: { chatId: string; user: { id: string; name: string } }) => {
+        if (!data?.chatId || !data?.user) return;
+        socket.to(`chat:${data.chatId}`).emit(`chat:${data.chatId}:typing`, {
+          user: data.user,
+          isTyping: false
+        });
+        socket.broadcast.emit(`chat:${data.chatId}:typing`, {
+          user: data.user,
+          isTyping: false
+        });
+      });
+
+      // =====================================================================
       // Real-time Direct Calling Notifications & Signals
       // =====================================================================
       socket.on("call:initiate", (data: any) => {

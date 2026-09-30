@@ -23,6 +23,8 @@ import { Input } from "@/components/ui/input";
 import { useModal } from "@/hooks/use-modal-store";
 import { EmojiPicker } from "@/components/emoji-picker";
 import { UserAvatar } from "@/components/user-avatar";
+import { useChatTyping } from "@/hooks/use-chat-typing";
+import { TypingIndicator } from "@/components/chat/typing-indicator";
 import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
@@ -48,6 +50,9 @@ const formSchema = z.object({
 export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProps) {
   const { onOpen } = useModal();
   const router = useRouter();
+
+  const chatId = query?.channelId || query?.conversationId || "";
+  const { typingUsers, startTyping, stopTyping } = useChatTyping({ chatId });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -143,6 +148,7 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
       }
 
       // ⚡ Instant UI Reset (0ms latency feedback for send button & input box)
+      stopTyping();
       form.setValue("content", "");
       form.reset({ content: "" });
       setReplyingTo(null);
@@ -161,12 +167,18 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
     }
   };
 
-  // Detect @ trigger in input
+  // Detect @ trigger in input and broadcast typing status
   const handleInputChange = (
     value: string,
     fieldOnChange: (val: string) => void
   ) => {
     fieldOnChange(value);
+
+    if (value.trim().length > 0) {
+      startTyping();
+    } else {
+      stopTyping();
+    }
 
     if (!serverId) return;
 
@@ -310,7 +322,10 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="px-3 pb-3 pt-1">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="px-3 pb-3 pt-0">
+        {/* Real-time Discord Typing Indicator */}
+        <TypingIndicator typingUsers={typingUsers} />
+
         <FormField
           control={form.control}
           name="content"
