@@ -46,7 +46,7 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
       if (!data?.user) return;
 
       // Filter out this exact client socket so the sender doesn't see their own typing indicator
-      if (socket.id && data.socketId && data.socketId === socket.id) {
+      if (data.socketId ? data.socketId === socket.id : (data.user?.id === currentUserId && !data.socketId)) {
         return;
       }
 
@@ -72,7 +72,7 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
     return () => {
       socket.off(eventKey, handleTypingEvent);
     };
-  }, [socket, chatId]);
+  }, [socket, chatId, currentUserId]);
 
   // Clean up stale typing indicators (older than 3.5 seconds)
   useEffect(() => {
@@ -86,49 +86,6 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
 
     return () => clearInterval(interval);
   }, []);
-
-  // Send typing start notification (via Socket + HTTP API fallback)
-  const startTyping = useCallback(() => {
-    if (!chatId) return;
-
-    setIsSelfTyping(true);
-    const now = Date.now();
-
-    // Emit if not currently marked as typing or if 1.5s has elapsed (heartbeat refresh)
-    if (!isTypingRef.current || now - lastEmitTimeRef.current > 1500) {
-      isTypingRef.current = true;
-      lastEmitTimeRef.current = now;
-
-      const payload = {
-        chatId,
-        user: {
-          id: currentUserId,
-          name: currentUserName
-        },
-        socketId: socket?.id,
-        isTyping: true
-      };
-
-      if (socket) {
-        socket.emit("chat:typing_start", payload);
-      }
-
-      // Fast non-blocking HTTP socket fallback
-      fetch("/api/socket/typing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      }).catch(() => {});
-    }
-
-    if (stopTimeoutRef.current) {
-      clearTimeout(stopTimeoutRef.current);
-    }
-
-    stopTimeoutRef.current = setTimeout(() => {
-      stopTyping();
-    }, 2500);
-  }, [socket, chatId, currentUserId, currentUserName]);
 
   // Send typing stop notification
   const stopTyping = useCallback(() => {
@@ -155,17 +112,59 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
         isTyping: false
       };
 
-      if (socket) {
+      if (socket?.connected) {
         socket.emit("chat:typing_stop", payload);
+      } else {
+        fetch("/api/socket/typing", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).catch(() => {});
       }
-
-      fetch("/api/socket/typing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      }).catch(() => {});
     }
   }, [socket, chatId, currentUserId, currentUserName]);
+
+  // Send typing start notification (via Socket or HTTP API fallback)
+  const startTyping = useCallback(() => {
+    if (!chatId) return;
+
+    setIsSelfTyping(true);
+    const now = Date.now();
+
+    // Emit if not currently marked as typing or if 1.5s has elapsed (heartbeat refresh)
+    if (!isTypingRef.current || now - lastEmitTimeRef.current > 1500) {
+      isTypingRef.current = true;
+      lastEmitTimeRef.current = now;
+
+      const payload = {
+        chatId,
+        user: {
+          id: currentUserId,
+          name: currentUserName
+        },
+        socketId: socket?.id,
+        isTyping: true
+      };
+
+      if (socket?.connected) {
+        socket.emit("chat:typing_start", payload);
+      } else {
+        fetch("/api/socket/typing", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).catch(() => {});
+      }
+    }
+
+    if (stopTimeoutRef.current) {
+      clearTimeout(stopTimeoutRef.current);
+    }
+
+    stopTimeoutRef.current = setTimeout(() => {
+      stopTyping();
+    }, 2500);
+  }, [socket, chatId, currentUserId, currentUserName, stopTyping]);
 
   // Stop typing on unmount or chat change
   useEffect(() => {

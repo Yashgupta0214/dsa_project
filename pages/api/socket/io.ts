@@ -177,20 +177,24 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
       // =====================================================================
       // Real-time Chat Typing Indicators
       // =====================================================================
-      socket.on("chat:typing_start", (data: { chatId: string; user: { id: string; name: string } }) => {
+      socket.on("chat:typing_start", (data: { chatId: string; user: { id: string; name: string }; socketId?: string }) => {
         if (!data?.chatId || !data?.user) return;
-        io.emit(`chat:${data.chatId}:typing`, {
+        const payload = {
           user: data.user,
+          socketId: data.socketId || socket.id,
           isTyping: true
-        });
+        };
+        socket.broadcast.emit(`chat:${data.chatId}:typing`, payload);
       });
 
-      socket.on("chat:typing_stop", (data: { chatId: string; user: { id: string; name: string } }) => {
+      socket.on("chat:typing_stop", (data: { chatId: string; user: { id: string; name: string }; socketId?: string }) => {
         if (!data?.chatId || !data?.user) return;
-        io.emit(`chat:${data.chatId}:typing`, {
+        const payload = {
           user: data.user,
+          socketId: data.socketId || socket.id,
           isTyping: false
-        });
+        };
+        socket.broadcast.emit(`chat:${data.chatId}:typing`, payload);
       });
 
       // =====================================================================

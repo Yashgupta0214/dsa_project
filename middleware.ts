@@ -10,6 +10,7 @@ const isPublicRoute = (req: NextRequest) => {
     path.startsWith("/api/livekit") ||
     path.startsWith("/api/socket/webhooks") ||
     path.startsWith("/api/socket/io") ||
+    path.startsWith("/api/socket/typing") ||
     path.startsWith("/api/upload") ||
     path.startsWith("/sign-in") ||
     path.startsWith("/sign-up") ||
@@ -21,6 +22,7 @@ export default authMiddleware({
   publicRoutes: isPublicRoute,
   ignoredRoutes: [
     "/api/socket/webhooks(.*)",
+    "/api/socket/typing(.*)",
   ],
 });
 

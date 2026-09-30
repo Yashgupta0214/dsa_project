@@ -323,8 +323,8 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="px-3 pb-3 pt-0">
-        {/* Real-time WhatsApp-style Typing Indicator (Visible to everyone else) */}
-        <TypingIndicator typingUsers={typingUsers} />
+        {/* Real-time WhatsApp-style Typing Indicator */}
+        <TypingIndicator typingUsers={typingUsers} isSelfTyping={isSelfTyping} />
 
         <FormField
           control={form.control}
@@ -395,9 +395,10 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
                     />
                     <div className="mr-1.5 flex-shrink-0">
                       <EmojiPicker
-                        onChange={(emoji: string) =>
-                          field.onChange(`${field.value ? field.value + " " : ""}${emoji}`)
-                        }
+                        onChange={(emoji: string) => {
+                          const updated = `${field.value ? field.value + " " : ""}${emoji}`;
+                          handleInputChange(updated, field.onChange);
+                        }}
                       />
                     </div>
                     <button

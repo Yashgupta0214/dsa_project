@@ -66,7 +66,14 @@ export async function NavigationSidebar() {
             afterSignOutUrl="/"
             appearance={{
               elements: {
-                avatarBox: "h-[44px] w-[44px] rounded-full shadow-md"
+                avatarBox: "h-[44px] w-[44px] rounded-full shadow-md",
+                userButtonPopoverCard: "bg-[#1e1f22] border border-white/10 shadow-2xl text-white",
+                userButtonPopoverActionButton: "text-zinc-200 hover:text-white hover:bg-white/10 transition",
+                userButtonPopoverActionButtonText: "text-zinc-200 font-medium",
+                userButtonPopoverActionButtonIcon: "text-zinc-300",
+                userButtonPopoverFooter: "text-zinc-400 bg-transparent",
+                userPreviewMainIdentifier: "text-white font-bold",
+                userPreviewSecondaryIdentifier: "text-zinc-400"
               }
             }}
           />
