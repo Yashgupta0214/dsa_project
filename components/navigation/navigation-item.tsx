@@ -103,7 +103,7 @@ export function NavigationItem({
           {unreadCount > 0 && !isActive && (
             <span
               aria-label={`${unreadCount} unread messages`}
-              className="absolute -top-1 right-1.5 z-20 flex min-w-[20px] h-5 px-1.5 items-center justify-center rounded-full bg-rose-500 dark:bg-rose-600 text-white text-[10px] font-black tracking-tight shadow-md shadow-rose-500/40 ring-2 ring-[#e3e5e8] dark:ring-[#11131a] animate-in zoom-in-75 duration-200 pointer-events-none select-none"
+              className="absolute -bottom-1 right-1.5 z-20 flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full bg-[#f23f43] text-white text-[10px] font-black tracking-tight shadow-md ring-2 ring-[#e3e5e8] dark:ring-[#11131a] animate-in zoom-in-75 duration-200 pointer-events-none select-none"
             >
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>

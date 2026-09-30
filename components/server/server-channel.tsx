@@ -59,38 +59,36 @@ export function ServerChannel({
   return (
     <button
       className={cn(
-        "group relative px-2.5 py-1.5 rounded-md flex items-center gap-x-2 w-full transition-all duration-150 focus:outline-none",
+        "group relative px-2 py-1.5 rounded-md flex items-center gap-x-2 w-full transition-all duration-150 focus:outline-none",
         !isActive &&
-          "hover:bg-zinc-200/60 dark:hover:bg-white/[0.06] text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100",
+          "hover:bg-zinc-200/60 dark:hover:bg-[#35373c]/60 text-zinc-600 dark:text-[#949ba4] hover:text-zinc-900 dark:hover:text-[#dbdee1]",
         !isActive && unreadCount > 0 &&
-          "text-zinc-900 dark:text-zinc-100 font-bold",
+          "text-zinc-900 dark:text-white font-semibold",
         isActive &&
-          "bg-zinc-200/80 dark:bg-indigo-500/20 text-zinc-900 dark:text-indigo-300 font-semibold shadow-sm"
+          "bg-zinc-200/90 dark:bg-[#35373c] text-zinc-900 dark:text-white font-semibold shadow-sm"
       )}
       onClick={onClick}
     >
       {isActive && (
-        <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />
+        <span className="absolute -left-2 top-1.5 bottom-1.5 w-1 rounded-r-full bg-indigo-500 dark:bg-white" />
       )}
       {!isActive && unreadCount > 0 && (
-        <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-2 rounded-r-full bg-zinc-800 dark:bg-white" />
+        <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-[4px] h-[8px] rounded-r-full bg-zinc-800 dark:bg-white" />
       )}
       <Icon
         className={cn(
-          "flex-shrink-0 w-3.5 h-3.5 transition-colors",
-          !isActive && "text-zinc-500 group-hover:text-zinc-700 dark:text-zinc-400 dark:group-hover:text-zinc-200",
-          !isActive && unreadCount > 0 && "text-zinc-900 dark:text-zinc-100",
-          isActive && channel.type === ChannelType.TEXT && "text-indigo-600 dark:text-indigo-400",
-          isActive && channel.type === ChannelType.AUDIO && "text-emerald-600 dark:text-emerald-400",
-          isActive && channel.type === ChannelType.VIDEO && "text-amber-600 dark:text-amber-400"
+          "flex-shrink-0 w-4 h-4 transition-colors",
+          !isActive && unreadCount === 0 && "text-zinc-500 group-hover:text-zinc-700 dark:text-[#80848e] dark:group-hover:text-[#dbdee1]",
+          !isActive && unreadCount > 0 && "text-zinc-900 dark:text-white",
+          isActive && "text-indigo-600 dark:text-white"
         )}
       />
       <p
         className={cn(
-          "line-clamp-1 text-[13px] tracking-tight transition-colors",
-          !isActive && "group-hover:text-zinc-900 dark:group-hover:text-zinc-100",
-          !isActive && unreadCount > 0 && "font-bold text-zinc-900 dark:text-white",
-          isActive && "text-indigo-700 dark:text-indigo-300 font-medium"
+          "line-clamp-1 text-[14px] tracking-tight transition-colors",
+          !isActive && unreadCount === 0 && "group-hover:text-zinc-900 dark:group-hover:text-[#dbdee1]",
+          !isActive && unreadCount > 0 && "font-semibold text-zinc-900 dark:text-white",
+          isActive && "text-zinc-900 dark:text-white font-semibold"
         )}
       >
         {channel.name}
@@ -98,7 +96,7 @@ export function ServerChannel({
 
       {/* Unread Badge */}
       {unreadCount > 0 && !isActive && (
-        <span className="ml-auto flex min-w-[18px] h-[18px] px-1 items-center justify-center rounded-full bg-rose-500 text-white text-[10px] font-bold shadow-sm shadow-rose-500/30 shrink-0">
+        <span className="ml-auto flex min-w-[18px] h-[18px] px-1.5 items-center justify-center rounded-full bg-[#f23f43] text-white text-[11px] font-bold shadow-sm shadow-[#f23f43]/40 shrink-0">
           {unreadCount > 99 ? "99+" : unreadCount}
         </span>
       )}
