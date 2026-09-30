@@ -17,7 +17,7 @@ export default async function handler(
       } catch {}
     }
 
-    const { chatId, isTyping, user } = body || {};
+    const { chatId, isTyping, user, socketId } = body || {};
 
     if (!chatId || !user) {
       return res.status(400).json({ error: "Missing chatId or user" });
@@ -27,6 +27,7 @@ export default async function handler(
       const eventKey = `chat:${chatId}:typing`;
       res.socket.server.io.emit(eventKey, {
         user,
+        socketId,
         isTyping: Boolean(isTyping)
       });
     }

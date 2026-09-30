@@ -20,6 +20,7 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const [isSelfTyping, setIsSelfTyping] = useState(false);
   const isTypingRef = useRef(false);
+  const lastEmitTimeRef = useRef(0);
   const stopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentUserName =
@@ -27,7 +28,7 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
     user?.firstName ||
     user?.username ||
     user?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
-    "You";
+    "Someone";
 
   const currentUserId = user?.id || "anonymous";
 
@@ -39,9 +40,15 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
 
     const handleTypingEvent = (data: {
       user: { id: string; name: string };
+      socketId?: string;
       isTyping: boolean;
     }) => {
-      if (!data?.user || data.user.id === currentUserId) return;
+      if (!data?.user) return;
+
+      // Filter out this exact client socket so the sender doesn't see their own typing indicator
+      if (socket.id && data.socketId && data.socketId === socket.id) {
+        return;
+      }
 
       setTypingUsers((prev) => {
         if (data.isTyping) {
@@ -65,17 +72,17 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
     return () => {
       socket.off(eventKey, handleTypingEvent);
     };
-  }, [socket, chatId, currentUserId]);
+  }, [socket, chatId]);
 
   // Clean up stale typing indicators (older than 3.5 seconds)
   useEffect(() => {
     const interval = setInterval(() => {
+      const now = Date.now();
       setTypingUsers((prev) => {
-        const now = Date.now();
         const active = prev.filter((u) => now - u.lastTypedAt < 3500);
         return active.length === prev.length ? prev : active;
       });
-    }, 800);
+    }, 500);
 
     return () => clearInterval(interval);
   }, []);
@@ -85,9 +92,12 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
     if (!chatId) return;
 
     setIsSelfTyping(true);
+    const now = Date.now();
 
-    if (!isTypingRef.current) {
+    // Emit if not currently marked as typing or if 1.5s has elapsed (heartbeat refresh)
+    if (!isTypingRef.current || now - lastEmitTimeRef.current > 1500) {
       isTypingRef.current = true;
+      lastEmitTimeRef.current = now;
 
       const payload = {
         chatId,
@@ -95,6 +105,7 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
           id: currentUserId,
           name: currentUserName
         },
+        socketId: socket?.id,
         isTyping: true
       };
 
@@ -132,6 +143,7 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
 
     if (isTypingRef.current) {
       isTypingRef.current = false;
+      lastEmitTimeRef.current = 0;
 
       const payload = {
         chatId,
@@ -139,6 +151,7 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
           id: currentUserId,
           name: currentUserName
         },
+        socketId: socket?.id,
         isTyping: false
       };
 
