@@ -118,13 +118,14 @@ function getDummyVideoTrack(): MediaStreamTrack | null {
   return null;
 }
 
-// Remote Participant Video & Audio Tile Component
 function RemoteParticipantTile({
   participant,
   isDeafened,
+  peerConnection,
 }: {
   participant: PeerParticipant;
   isDeafened: boolean;
+  peerConnection?: RTCPeerConnection;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -137,13 +138,18 @@ function RemoteParticipantTile({
     !participant.mediaState.isVideoOff
   );
 
-  // Video attachment and playback (ALWAYS MUTED so browser autoplay policy never blocks it or halts audio)
+  // Video attachment and playback (PURE VIDEO ONLY - no audio tracks attached to <video> so audio is never muted!)
   useEffect(() => {
     const videoElement = videoRef.current;
     if (!videoElement || !participant.stream) return;
 
-    if (videoElement.srcObject !== participant.stream) {
-      videoElement.srcObject = participant.stream;
+    const videoTracks = participant.stream.getVideoTracks();
+    if (videoTracks.length === 0) return;
+
+    // Isolate video tracks into a pure video stream with ZERO audio tracks
+    const videoStream = new MediaStream(videoTracks);
+    if (videoElement.srcObject !== videoStream) {
+      videoElement.srcObject = videoStream;
     }
     videoElement.muted = true;
 
@@ -157,24 +163,29 @@ function RemoteParticipantTile({
 
     playVideo();
 
-    participant.stream.getVideoTracks().forEach((track) => {
+    videoTracks.forEach((track) => {
       track.addEventListener("unmute", playVideo);
     });
 
     return () => {
-      participant.stream?.getVideoTracks().forEach((track) => {
+      videoTracks.forEach((track) => {
         track.removeEventListener("unmute", playVideo);
       });
     };
   }, [participant.stream, hasVideoStream, participant.mediaState.isVideoOff]);
 
-  // Audio attachment and playback with resilient track handling
+  // Audio attachment and playback (Dedicated Audio Stream!)
   useEffect(() => {
     const audioElement = audioRef.current;
     if (!audioElement || !participant.stream) return;
 
-    if (audioElement.srcObject !== participant.stream) {
-      audioElement.srcObject = participant.stream;
+    const audioTracks = participant.stream.getAudioTracks();
+    if (audioTracks.length === 0) return;
+
+    // Dedicated clean audio stream
+    const audioStream = new MediaStream(audioTracks);
+    if (audioElement.srcObject !== audioStream) {
+      audioElement.srcObject = audioStream;
     }
     audioElement.muted = isDeafened;
     audioElement.volume = 1.0;
@@ -189,64 +200,55 @@ function RemoteParticipantTile({
 
     playAudio();
 
-    participant.stream.getAudioTracks().forEach((track) => {
+    audioTracks.forEach((track) => {
       track.addEventListener("unmute", playAudio);
     });
 
     return () => {
-      participant.stream?.getAudioTracks().forEach((track) => {
+      audioTracks.forEach((track) => {
         track.removeEventListener("unmute", playAudio);
       });
     };
   }, [participant.stream, isDeafened]);
 
-  // Audio visualizer for remote participant
+  // Native WebRTC audio level stats (clean, zero AudioContext stream-hijacking!)
   useEffect(() => {
-    if (!participant.stream) return;
-    const audioTracks = participant.stream.getAudioTracks();
-    if (!audioTracks.length) return;
+    if (!peerConnection) return;
 
     let animId: number;
-    let audioCtx: AudioContext | null = null;
     let isCancelled = false;
 
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioContextClass) {
-        audioCtx = new AudioContextClass();
-        if (audioCtx.state === "suspended") {
-          audioCtx.resume().catch(() => {});
-        }
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 64;
-        const source = audioCtx.createMediaStreamSource(participant.stream);
-        source.connect(analyser);
+    const checkStats = async () => {
+      if (isCancelled) return;
+      try {
+        const stats = await peerConnection.getStats();
+        let level = 0;
+        stats.forEach((report) => {
+          if (report.type === "inbound-rtp" && report.kind === "audio") {
+            if (typeof report.audioLevel === "number") {
+              level = report.audioLevel * 100;
+            }
+          }
+        });
+        setAudioLevel(level);
+      } catch {}
 
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        const check = () => {
-          if (isCancelled) return;
-          analyser.getByteFrequencyData(dataArray);
-          let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-          setAudioLevel(sum / dataArray.length);
-          animId = requestAnimationFrame(check);
-        };
-        check();
+      if (!isCancelled) {
+        animId = requestAnimationFrame(() => {
+          setTimeout(checkStats, 200);
+        });
       }
-    } catch (e) {
-      console.log("Remote audio analyser error:", e);
-    }
+    };
+
+    checkStats();
 
     return () => {
       isCancelled = true;
       if (animId) cancelAnimationFrame(animId);
-      if (audioCtx && audioCtx.state !== "closed") {
-        audioCtx.close().catch(() => {});
-      }
     };
-  }, [participant.stream]);
+  }, [peerConnection]);
 
-  const isSpeaking = audioLevel > 5 && !participant.mediaState.isMuted;
+  const isSpeaking = audioLevel > 2 && !participant.mediaState.isMuted;
   const isConnecting = !participant.stream || participant.connectionState === "connecting";
   const statusLabel = participant.mediaState.isMuted
     ? "Muted"
@@ -390,12 +392,21 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
   const syncAudioTrackToPeers = useCallback((stream: MediaStream | null) => {
     const audioTrack = stream?.getAudioTracks()[0] || null;
 
+    if (audioTrack) {
+      audioTrack.enabled = !currentMediaStateRef.current.isMuted;
+    }
+
     peerConnectionsRef.current.forEach((pc) => {
       const transceivers = pc.getTransceivers();
-      const audioTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "audio" || t.sender?.track?.kind === "audio");
+      const audioTransceiver = transceivers.find(
+        (t) => t.receiver?.track?.kind === "audio" || t.sender?.track?.kind === "audio" || t.mid === "0"
+      );
       const audioSender = audioTransceiver?.sender || pc.getSenders().find((sender) => sender.track?.kind === "audio");
 
       if (audioSender) {
+        if (audioTransceiver && audioTransceiver.direction !== "sendrecv") {
+          audioTransceiver.direction = "sendrecv";
+        }
         audioSender.replaceTrack(audioTrack).catch((err) => console.error("Error replacing audio track:", err));
       } else if (audioTrack && stream) {
         pc.addTrack(audioTrack, stream);
@@ -1347,6 +1358,7 @@ export function MediaRoom({ chatId, video, audio, serverId }: MediaRoomProps) {
               key={participant.socketId}
               participant={participant}
               isDeafened={isDeafened}
+              peerConnection={peerConnectionsRef.current.get(participant.socketId)}
             />
           ))}
 
