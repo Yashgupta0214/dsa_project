@@ -12,6 +12,7 @@ import { ChatItem } from "@/components/chat/chat-item";
 import { useChatQuery } from "@/hooks/use-chat-query";
 import { useChatSocket } from "@/hooks/use-chat-socket";
 import { useChatScroll } from "@/hooks/use-chat-scroll";
+import { useUnreadStore } from "@/hooks/use-unread-store";
 
 interface ChatMessagesProps {
   name: string;
@@ -73,7 +74,15 @@ export function ChatMessages({
 
   // Automatically mark unread messages as seen when chat/channel is active
   useEffect(() => {
-    if (!chatId || !member?.id) return;
+    if (!chatId) return;
+
+    if (type === "channel") {
+      useUnreadStore.getState().clearChannelUnread(chatId);
+    } else if (type === "conversation") {
+      useUnreadStore.getState().clearConversationUnread(chatId);
+    }
+
+    if (!member?.id) return;
 
     if (type === "conversation") {
       const hasUnread = data?.pages?.some((page: any) =>

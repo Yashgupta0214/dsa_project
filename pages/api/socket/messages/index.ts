@@ -84,6 +84,8 @@ export default async function handler(
       serverId: serverId as string,
       serverName: channel.server.name,
       senderId: profile.userId,
+      senderProfileId: profile.id,
+      senderMemberId: member.id,
       senderName: profile.name,
       senderAvatar: profile.imageUrl,
       type: "channel",

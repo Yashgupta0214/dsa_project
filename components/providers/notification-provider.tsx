@@ -26,7 +26,11 @@ export type NotificationPayload = {
   serverName?: string;
   conversationId?: string;
   recipientId?: string;
+  recipientProfileId?: string;
+  recipientMemberId?: string;
   senderId: string;
+  senderProfileId?: string;
+  senderMemberId?: string;
   senderName: string;
   senderAvatar: string;
   type: "channel" | "direct_message" | "webhook";
@@ -89,13 +93,34 @@ export function NotificationProvider({
     }
   }, []);
 
-  // Clear unread count for the active server whenever user navigates to it
+  // Clear unread count for the active server, channel, or DM whenever user navigates to it
   useEffect(() => {
-    if (pathname) {
-      const match = pathname.match(/\/servers\/([a-zA-Z0-9_-]+)/);
-      if (match && match[1]) {
-        useUnreadStore.getState().clearUnread(match[1]);
-      }
+    if (!pathname) return;
+
+    // Server
+    const serverMatch = pathname.match(/\/servers\/([a-zA-Z0-9_-]+)/);
+    if (serverMatch && serverMatch[1]) {
+      useUnreadStore.getState().clearServerUnread(serverMatch[1]);
+    }
+
+    // Channel
+    const channelMatch = pathname.match(/\/channels\/([a-zA-Z0-9_-]+)/);
+    if (channelMatch && channelMatch[1]) {
+      useUnreadStore.getState().clearChannelUnread(channelMatch[1]);
+    }
+
+    // Server Conversations (DMs)
+    const conversationMatch = pathname.match(/\/conversations\/([a-zA-Z0-9_-]+)/);
+    if (conversationMatch && conversationMatch[1]) {
+      useUnreadStore.getState().clearMemberUnread(conversationMatch[1]);
+      useUnreadStore.getState().clearConversationUnread(conversationMatch[1]);
+    }
+
+    // Direct Messages Section
+    const dmMatch = pathname.match(/\/direct-messages\/([a-zA-Z0-9_-]+)/);
+    if (dmMatch && dmMatch[1]) {
+      useUnreadStore.getState().clearMemberUnread(dmMatch[1]);
+      useUnreadStore.getState().clearConversationUnread(dmMatch[1]);
     }
   }, [pathname]);
 
@@ -132,17 +157,52 @@ export function NotificationProvider({
       // Don't notify the sender themselves
       if (payload.senderId === userId) return;
 
-      // Track unread message count for servers if user is not currently in that server
-      if (payload.serverId) {
-        const isCurrentServer = pathname?.includes(`/servers/${payload.serverId}`);
-        if (!isCurrentServer) {
-          useUnreadStore.getState().incrementUnread(payload.serverId);
-        }
-      }
-
       // If it's a DM, only notify the intended recipient
       if (payload.type === "direct_message" && payload.recipientId && payload.recipientId !== userId) {
         return;
+      }
+
+      const isInSameChannel = Boolean(
+        payload.channelId && pathname?.includes(`/channels/${payload.channelId}`)
+      );
+      const isInSameConversation = Boolean(
+        (payload.conversationId && pathname?.includes(payload.conversationId)) ||
+        (payload.senderMemberId && pathname?.includes(payload.senderMemberId)) ||
+        (payload.senderProfileId && pathname?.includes(payload.senderProfileId))
+      );
+      const isInSameServer = Boolean(
+        payload.serverId && pathname?.includes(`/servers/${payload.serverId}`)
+      );
+
+      // 1. Group / Channel message unread tracking
+      if (payload.type === "channel" || payload.channelId) {
+        if (payload.channelId && !isInSameChannel) {
+          useUnreadStore.getState().incrementChannelUnread(payload.channelId);
+        }
+        if (payload.serverId && !isInSameServer) {
+          useUnreadStore.getState().incrementServerUnread(payload.serverId);
+        }
+      }
+
+      // 2. Direct message unread tracking
+      if (payload.type === "direct_message") {
+        if (!isInSameConversation) {
+          if (payload.conversationId) {
+            useUnreadStore.getState().incrementConversationUnread(payload.conversationId);
+          }
+          if (payload.senderMemberId) {
+            useUnreadStore.getState().incrementMemberUnread(payload.senderMemberId);
+          }
+          if (payload.senderProfileId) {
+            useUnreadStore.getState().incrementMemberUnread(payload.senderProfileId);
+          }
+          if (payload.senderId) {
+            useUnreadStore.getState().incrementMemberUnread(payload.senderId);
+          }
+          if (payload.serverId && !isInSameServer) {
+            useUnreadStore.getState().incrementServerUnread(payload.serverId);
+          }
+        }
       }
 
       // Check if current user is specifically mentioned (@username, @fullname, @everyone, @here)
@@ -161,11 +221,6 @@ export function NotificationProvider({
 
       payload.isMention = isDirectMention;
 
-      // Check if user is currently actively focused on this exact channel/conversation
-      const isInSameChannel =
-        payload.channelId && pathname?.includes(`/channels/${payload.channelId}`);
-      const isInSameConversation =
-        payload.conversationId && pathname?.includes(payload.conversationId);
       const isWindowFocused = typeof document !== "undefined" && document.hasFocus();
 
       // Play sound if enabled (Distinct mention sound if mentioned!)

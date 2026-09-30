@@ -29,7 +29,7 @@ import { FileUpload } from "@/components/file-upload";
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "Server name is required." }),
-  imageUrl: z.string().min(1, { message: "Server image is required." })
+  imageUrl: z.string().optional()
 });
 
 export function InitialModal() {
@@ -48,11 +48,15 @@ export function InitialModal() {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      await axios.post("/api/servers", values);
+      const response = await axios.post("/api/servers", values);
 
       form.reset();
       router.refresh();
-      window.location.reload();
+      if (response?.data?.id) {
+        router.push(`/servers/${response.data.id}`);
+      } else {
+        window.location.reload();
+      }
     } catch (error) {
       console.error(error);
     }
