@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useSocket } from "@/components/providers/socket-provider";
 import { useUser } from "@clerk/nextjs";
 
-interface TypingUser {
+export interface TypingUser {
   id: string;
   name: string;
   lastTypedAt: number;
@@ -18,6 +18,7 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
   const { socket } = useSocket();
   const { user } = useUser();
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
+  const [isSelfTyping, setIsSelfTyping] = useState(false);
   const isTypingRef = useRef(false);
   const stopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -26,9 +27,9 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
     user?.firstName ||
     user?.username ||
     user?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
-    "Someone";
+    "You";
 
-  const currentUserId = user?.id;
+  const currentUserId = user?.id || "anonymous";
 
   // Listen to typing events for this specific chat
   useEffect(() => {
@@ -66,32 +67,47 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
     };
   }, [socket, chatId, currentUserId]);
 
-  // Clean up stale typing indicators (older than 4 seconds)
+  // Clean up stale typing indicators (older than 3.5 seconds)
   useEffect(() => {
     const interval = setInterval(() => {
       setTypingUsers((prev) => {
         const now = Date.now();
-        const active = prev.filter((u) => now - u.lastTypedAt < 4000);
+        const active = prev.filter((u) => now - u.lastTypedAt < 3500);
         return active.length === prev.length ? prev : active;
       });
-    }, 1000);
+    }, 800);
 
     return () => clearInterval(interval);
   }, []);
 
-  // Send typing start notification
+  // Send typing start notification (via Socket + HTTP API fallback)
   const startTyping = useCallback(() => {
-    if (!socket || !chatId || !currentUserId) return;
+    if (!chatId) return;
+
+    setIsSelfTyping(true);
 
     if (!isTypingRef.current) {
       isTypingRef.current = true;
-      socket.emit("chat:typing_start", {
+
+      const payload = {
         chatId,
         user: {
           id: currentUserId,
           name: currentUserName
-        }
-      });
+        },
+        isTyping: true
+      };
+
+      if (socket) {
+        socket.emit("chat:typing_start", payload);
+      }
+
+      // Fast non-blocking HTTP socket fallback
+      fetch("/api/socket/typing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).catch(() => {});
     }
 
     if (stopTimeoutRef.current) {
@@ -105,7 +121,9 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
 
   // Send typing stop notification
   const stopTyping = useCallback(() => {
-    if (!socket || !chatId || !currentUserId) return;
+    if (!chatId) return;
+
+    setIsSelfTyping(false);
 
     if (stopTimeoutRef.current) {
       clearTimeout(stopTimeoutRef.current);
@@ -114,13 +132,25 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
 
     if (isTypingRef.current) {
       isTypingRef.current = false;
-      socket.emit("chat:typing_stop", {
+
+      const payload = {
         chatId,
         user: {
           id: currentUserId,
           name: currentUserName
-        }
-      });
+        },
+        isTyping: false
+      };
+
+      if (socket) {
+        socket.emit("chat:typing_stop", payload);
+      }
+
+      fetch("/api/socket/typing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).catch(() => {});
     }
   }, [socket, chatId, currentUserId, currentUserName]);
 
@@ -133,6 +163,7 @@ export function useChatTyping({ chatId }: UseChatTypingProps) {
 
   return {
     typingUsers,
+    isSelfTyping,
     startTyping,
     stopTyping
   };

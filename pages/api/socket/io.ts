@@ -116,11 +116,7 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
       // =====================================================================
       socket.on("chat:typing_start", (data: { chatId: string; user: { id: string; name: string } }) => {
         if (!data?.chatId || !data?.user) return;
-        socket.to(`chat:${data.chatId}`).emit(`chat:${data.chatId}:typing`, {
-          user: data.user,
-          isTyping: true
-        });
-        socket.broadcast.emit(`chat:${data.chatId}:typing`, {
+        io.emit(`chat:${data.chatId}:typing`, {
           user: data.user,
           isTyping: true
         });
@@ -128,11 +124,7 @@ const ioHandler = (req: NextApiRequest, res: NextApiResponseServerIo) => {
 
       socket.on("chat:typing_stop", (data: { chatId: string; user: { id: string; name: string } }) => {
         if (!data?.chatId || !data?.user) return;
-        socket.to(`chat:${data.chatId}`).emit(`chat:${data.chatId}:typing`, {
-          user: data.user,
-          isTyping: false
-        });
-        socket.broadcast.emit(`chat:${data.chatId}:typing`, {
+        io.emit(`chat:${data.chatId}:typing`, {
           user: data.user,
           isTyping: false
         });

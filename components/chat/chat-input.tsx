@@ -52,7 +52,7 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
   const router = useRouter();
 
   const chatId = query?.channelId || query?.conversationId || "";
-  const { typingUsers, startTyping, stopTyping } = useChatTyping({ chatId });
+  const { typingUsers, isSelfTyping, startTyping, stopTyping } = useChatTyping({ chatId });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -323,8 +323,8 @@ export function ChatInput({ apiUrl, query, name, type, serverId }: ChatInputProp
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="px-3 pb-3 pt-0">
-        {/* Real-time Discord Typing Indicator */}
-        <TypingIndicator typingUsers={typingUsers} />
+        {/* Real-time Discord & WhatsApp Typing Indicator */}
+        <TypingIndicator typingUsers={typingUsers} isSelfTyping={isSelfTyping} />
 
         <FormField
           control={form.control}
